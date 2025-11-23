@@ -66,7 +66,7 @@ def save_settings(settings_dict):
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
-# --- Окно настроек (без изменений) ---
+# --- Окно настроек ---
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent):
@@ -335,6 +335,19 @@ class MainWindow(Gtk.ApplicationWindow):
         # Запускаем поиск 
         self.start_new_search(self.current_query)
 
+    # --- МЕТОДЫ КЭШИРОВАНИЯ ---
+    def get_cache_dir(self):
+        """Возвращает путь к папке кэша и создает ее, если она не существует."""
+        cache_dir = os.path.join(GLib.get_user_cache_dir(), "wallhaven_viewer_cache")
+        if not os.path.exists(cache_dir):
+            try:
+                os.makedirs(cache_dir)
+            except OSError as e:
+                print(f"Ошибка создания папки кэша: {e}")
+                return None
+        return cache_dir
+    # --- КОНЕЦ МЕТОДОВ КЭШИРОВАНИЯ ---
+
     # --- МЕТОД ДЛЯ ПОКАЗА ОШИБКИ ---
     def show_infobar(self, message):
         """Показывает сообщение об ошибке в Gtk.InfoBar и скрывает его через 5 секунд."""
@@ -396,7 +409,7 @@ class MainWindow(Gtk.ApplicationWindow):
         
         self.on_filter_changed(toggle_button)
 
-    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ (ВОССТАНОВЛЕНО) ---
+    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ ---
     def on_scroll_changed(self, adj):
         if self.is_loading or not self.has_more_pages:
             return
@@ -460,20 +473,57 @@ class MainWindow(Gtk.ApplicationWindow):
         loader.close()
         return loader.get_pixbuf()
 
-    # --- Остальные методы (без изменений) ---
-
+    # --- АСИНХРОННАЯ ЗАГРУЗКА МИНИАТЮРЫ (С КЭШИРОВАНИЕМ) ---
     def load_thumbnail_async(self, thumb_url, full_url):
+        cache_dir = self.get_cache_dir()
+        if not cache_dir:
+            # Если кэш недоступен, продолжаем обычную загрузку без кэширования
+            cache_path = None
+            filename = None
+        else:
+            filename = thumb_url.split('/')[-1]
+            cache_path = os.path.join(cache_dir, filename)
+
         def worker():
-            try:
-                img_data = requests.get(thumb_url, timeout=10).content
-                pixbuf = self.load_pixbuf_from_bytes(img_data)
-                GLib.idle_add(self.add_thumbnail_to_ui, pixbuf, full_url)
-            except requests.exceptions.Timeout:
-                pass 
-            except Exception:
-                pass
+            img_data = None
+            
+            # 1. Попытка загрузить из кэша
+            if cache_path and os.path.exists(cache_path):
+                try:
+                    with open(cache_path, "rb") as f:
+                        img_data = f.read()
+                except Exception:
+                    img_data = None 
+
+            # 2. Загрузка из сети, если нет в кэше
+            if img_data is None:
+                try:
+                    img_data = requests.get(thumb_url, timeout=10).content
+                    
+                    # 3. Сохранение в кэш
+                    if cache_path:
+                        try:
+                            with open(cache_path, "wb") as f:
+                                f.write(img_data)
+                        except Exception as e:
+                            print(f"Ошибка сохранения в кэш: {e}") 
+                            
+                except requests.exceptions.Timeout:
+                    return 
+                except Exception:
+                    return 
+
+            # Отображение
+            if img_data:
+                try:
+                    pixbuf = self.load_pixbuf_from_bytes(img_data)
+                    GLib.idle_add(self.add_thumbnail_to_ui, pixbuf, full_url)
+                except Exception:
+                    pass
 
         threading.Thread(target=worker, daemon=True).start()
+    # --- КОНЕЦ load_thumbnail_async ---
+
 
     def add_thumbnail_to_ui(self, pixbuf, full_url):
         try:
@@ -608,7 +658,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.load_next_page()
 
 
-# --- Окно полноразмерного изображения (без изменений) ---
+# --- Окно полноразмерного изображения (С ИСПРАВЛЕННЫМ ЗАГОЛОВКОМ) ---
 
 class FullImageWindow(Gtk.Window):
     def __init__(self, parent, image_url, download_path):
@@ -617,6 +667,9 @@ class FullImageWindow(Gtk.Window):
         self.image_url = image_url
         self.download_path = download_path
         self.image_data = None
+        
+        self.wallpaper_id = image_url.split('/')[-1].split('.')[0]
+        self.set_title(f"Wallhaven - ID: {self.wallpaper_id}")
 
         header = Gtk.HeaderBar()
         self.set_titlebar(header)
@@ -648,9 +701,23 @@ class FullImageWindow(Gtk.Window):
         spinner_box.append(self.spinner)
         overlay.add_overlay(spinner_box)
 
-        threading.Thread(target=self.load_image, daemon=True).start()
+        # Выполняем загрузку изображения и информации параллельно
+        threading.Thread(target=self.load_image_and_info, daemon=True).start()
 
-    def load_image(self):
+    def load_image_and_info(self):
+        """Загружает изображение и дополнительную информацию (для заголовка)"""
+        
+        # 1. Загрузка информации об изображении для разрешения
+        resolution = "N/A"
+        try:
+            info_url = f"https://wallhaven.cc/api/v1/w/{self.wallpaper_id}"
+            info_resp = requests.get(info_url, timeout=5).json()
+            resolution = info_resp.get("data", {}).get("resolution", "N/A")
+            GLib.idle_add(self.update_title, resolution)
+        except Exception:
+            GLib.idle_add(self.update_title, resolution)
+            
+        # 2. Загрузка самого изображения
         try:
             resp = requests.get(self.image_url, stream=True, timeout=60)
             resp.raise_for_status()
@@ -665,6 +732,11 @@ class FullImageWindow(Gtk.Window):
             GLib.idle_add(self.update_image, pixbuf)
         except Exception:
             GLib.idle_add(self.spinner.stop)
+
+    def update_title(self, resolution):
+        """Обновляет заголовок окна с ID и разрешением."""
+        title = f"Wallhaven - ID: {self.wallpaper_id} ({resolution})"
+        self.set_title(title)
 
     def update_image(self, pixbuf):
         texture = Gdk.Texture.new_for_pixbuf(pixbuf)

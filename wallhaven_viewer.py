@@ -10,13 +10,45 @@ import configparser
 API_URL = "https://wallhaven.cc/api/v1/search"
 CONFIG_FILE = "wallhaven_viewer.ini"
 
+# --- НОВЫЕ КОНСТАНТЫ ---
+RESOLUTION_OPTIONS = [
+    ("Любое", ""),
+    ("1024x768 (XGA)", "1024x768"),
+    ("1280x720 (HD)", "1280x720"),
+    ("1920x1080 (FHD)", "1920x1080"),
+    ("2560x1440 (QHD)", "2560x1440"),
+    ("3840x2160 (4K)", "3840x2160"),
+    ("5120x2880 (5K)", "5120x2880"),
+    ("7680x4320 (8K)", "7680x4320"),
+]
+RATIO_OPTIONS = [
+    ("Любое", ""),
+    ("16:9", "16x9"),
+    ("16:10", "16x10"),
+    ("4:3", "4x3"),
+    ("5:4", "5x4"),
+    ("21:9", "21x9"),
+    ("32:9", "32x9"),
+]
+
+# --- НАСТРОЙКИ ---
 DEFAULT_SETTINGS = {
     'api_key': '',
     'download_path': '',
-    'columns': '4'
+    'columns': '4',
+    'last_query': '',
+    'cat_general': 'true',
+    'cat_anime': 'true',
+    'cat_people': 'true',
+    'purity_sfw': 'true',
+    'purity_sketchy': 'false',
+    'purity_nsfw': 'false',
+    'sort_index': '5', 
+    'resolution_index': '0', 
+    'ratio_index': '0'       
 }
 
-# --- Настройки ---
+# --- Функции для настроек ---
 
 def load_settings():
     config = configparser.ConfigParser()
@@ -30,11 +62,11 @@ def load_settings():
 
 def save_settings(settings_dict):
     config = configparser.ConfigParser()
-    config['Settings'] = settings_dict
+    config['Settings'] = {k: v for k, v in settings_dict.items() if k in DEFAULT_SETTINGS}
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
-# --- Окно настроек ---
+# --- Окно настроек (без изменений) ---
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent):
@@ -111,13 +143,17 @@ class SettingsWindow(Gtk.Window):
         except Exception: pass
 
     def on_save_clicked(self, btn):
-        new_settings = {
+        new_app_settings = {
             'api_key': self.entry_api.get_text().strip(),
             'download_path': self.entry_path.get_text().strip(),
             'columns': str(int(self.spin_cols.get_value()))
         }
-        save_settings(new_settings)
-        self.parent_window.apply_settings(new_settings)
+        
+        current_search_state = self.parent_window.get_current_search_state()
+        final_settings = {**self.parent_window.settings, **new_app_settings, **current_search_state}
+
+        save_settings(final_settings)
+        self.parent_window.apply_settings(final_settings)
         self.close()
 
 # --- Приложение ---
@@ -138,25 +174,48 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_default_size(1200, 850)
 
         self.current_page = 1
-        self.current_query = "" 
         self.settings = load_settings()
-        self.is_loading = False
+        self.current_query = self.settings['last_query']
+        self.is_loading = False 
         self.has_more_pages = True
 
-        # UI
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        vbox.set_margin_start(10)
-        vbox.set_margin_end(10)
-        vbox.set_margin_top(10)
-        vbox.set_margin_bottom(10)
-        self.set_child(vbox)
+        # 1. Overlay
+        overlay = Gtk.Overlay()
+        self.set_child(overlay) 
+
+        # 2. Основной вертикальный бокс
+        main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        main_vbox.set_margin_start(10)
+        main_vbox.set_margin_end(10)
+        main_vbox.set_margin_top(10)
+        main_vbox.set_margin_bottom(10)
+        overlay.set_child(main_vbox) 
+        
+        # --- Gtk.InfoBar для сообщений об ошибках ---
+        self.infobar = Gtk.InfoBar()
+        self.infobar.set_visible(False) 
+        self.infobar.add_css_class("error") 
+
+        self.infobar_label = Gtk.Label(label="Ошибка API")
+        
+        # Используем add_child для старых версий GTK4
+        self.infobar.add_child(self.infobar_label) 
+
+        self.infobar.add_button("Закрыть", Gtk.ResponseType.CLOSE)
+        self.infobar.connect("response", lambda w, r: self.infobar.set_visible(False))
+        
+        overlay.add_overlay(self.infobar)
+        self.infobar.set_halign(Gtk.Align.CENTER)
+        self.infobar.set_valign(Gtk.Align.START)
+
 
         # Поиск
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        vbox.append(search_box)
+        main_vbox.append(search_box)
 
         self.entry = Gtk.Entry()
         self.entry.set_placeholder_text("Поиск (оставьте пустым для топа)...")
+        self.entry.set_text(self.current_query) 
         self.entry.set_hexpand(True)
         self.entry.connect("activate", self.on_search_clicked)
         search_box.append(self.entry)
@@ -165,49 +224,81 @@ class MainWindow(Gtk.ApplicationWindow):
         btn_search.connect("clicked", self.on_search_clicked)
         search_box.append(btn_search)
 
-        # Фильтры
+        # --- Фильтры ---
         filters_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
-        vbox.append(filters_box)
+        main_vbox.append(filters_box)
 
+        # Категории
         cat_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         cat_box.add_css_class("linked")
         filters_box.append(cat_box)
         
         self.btn_general = Gtk.ToggleButton(label="General")
-        self.btn_general.set_active(True)
+        self.btn_general.set_active(self.settings['cat_general'].lower() == 'true')
         cat_box.append(self.btn_general)
+        
         self.btn_anime = Gtk.ToggleButton(label="Anime")
-        self.btn_anime.set_active(True)
+        self.btn_anime.set_active(self.settings['cat_anime'].lower() == 'true')
         cat_box.append(self.btn_anime)
+        
         self.btn_people = Gtk.ToggleButton(label="People")
-        self.btn_people.set_active(True)
+        self.btn_people.set_active(self.settings['cat_people'].lower() == 'true')
         cat_box.append(self.btn_people)
 
         filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
 
+        # Purity
         purity_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         purity_box.add_css_class("linked")
         filters_box.append(purity_box)
         
         self.btn_sfw = Gtk.ToggleButton(label="SFW")
-        self.btn_sfw.set_active(True)
+        self.btn_sfw.set_active(self.settings['purity_sfw'].lower() == 'true')
         purity_box.append(self.btn_sfw)
+        
         self.btn_sketchy = Gtk.ToggleButton(label="Sketchy")
+        self.btn_sketchy.set_active(self.settings['purity_sketchy'].lower() == 'true')
         purity_box.append(self.btn_sketchy)
         self.btn_sketchy.connect("clicked", self.check_api_key_on_purity_change)
+        
         self.btn_nsfw = Gtk.ToggleButton(label="NSFW")
+        self.btn_nsfw.set_active(self.settings['purity_nsfw'].lower() == 'true')
         purity_box.append(self.btn_nsfw)
         self.btn_nsfw.connect("clicked", self.check_api_key_on_purity_change)
 
         filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+        
+        # Разрешение
+        filters_box.append(Gtk.Label(label="Разрешение:"))
+        res_options = Gtk.StringList()
+        for label, _ in RESOLUTION_OPTIONS:
+            res_options.append(label)
+        self.res_dropdown = Gtk.DropDown(model=res_options)
+        self.res_dropdown.set_selected(int(self.settings['resolution_index']))
+        self.res_dropdown.connect("notify::selected", self.on_filter_changed)
+        filters_box.append(self.res_dropdown)
 
+        # Соотношение сторон
+        filters_box.append(Gtk.Label(label="Соотношение:"))
+        ratio_options = Gtk.StringList()
+        for label, _ in RATIO_OPTIONS:
+            ratio_options.append(label)
+        self.ratio_dropdown = Gtk.DropDown(model=ratio_options)
+        self.ratio_dropdown.set_selected(int(self.settings['ratio_index']))
+        self.ratio_dropdown.connect("notify::selected", self.on_filter_changed)
+        filters_box.append(self.ratio_dropdown)
+        
+        filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+
+        # Сортировка
         filters_box.append(Gtk.Label(label="Сортировка:"))
         sort_options = Gtk.StringList()
         for opt in ["Relevance", "Random", "Date Added", "Views", "Favorites", "Toplist", "Hot"]:
             sort_options.append(opt)
         
         self.sort_dropdown = Gtk.DropDown(model=sort_options)
-        self.sort_dropdown.set_selected(5) 
+        self.sort_dropdown.set_selected(int(self.settings['sort_index'])) 
+        self.sort_dropdown.connect("notify::selected", self.on_filter_changed)
         filters_box.append(self.sort_dropdown)
         
         btn_settings = Gtk.Button(icon_name="preferences-system-symbolic")
@@ -218,9 +309,10 @@ class MainWindow(Gtk.ApplicationWindow):
         # Контент
         self.scrolled = Gtk.ScrolledWindow()
         self.scrolled.set_vexpand(True)
-        vbox.append(self.scrolled)
+        main_vbox.append(self.scrolled)
 
         self.v_adj = self.scrolled.get_vadjustment()
+        # ПОДКЛЮЧЕНИЕ МЕТОДА БЕСКОНЕЧНОГО СКРОЛЛА
         self.v_adj.connect("value-changed", self.on_scroll_changed)
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
@@ -235,15 +327,46 @@ class MainWindow(Gtk.ApplicationWindow):
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
         content_box.append(self.flowbox)
 
-        # Спиннер для "Загрузить еще"
         self.bottom_spinner = Gtk.Spinner()
         self.bottom_spinner.set_size_request(32, 32)
         self.bottom_spinner.set_halign(Gtk.Align.CENTER)
         content_box.append(self.bottom_spinner)
+        
+        # Запускаем поиск 
+        self.start_new_search(self.current_query)
 
-        self.start_new_search("")
+    # --- МЕТОД ДЛЯ ПОКАЗА ОШИБКИ ---
+    def show_infobar(self, message):
+        """Показывает сообщение об ошибке в Gtk.InfoBar и скрывает его через 5 секунд."""
+        self.infobar_label.set_text(message)
+        self.infobar.set_visible(True) 
+        GLib.timeout_add_seconds(5, lambda: self.infobar.set_visible(False))
+        return False
 
     # --- Логика ---
+
+    def get_current_search_state(self):
+        """Собирает текущее состояние всех фильтров для сохранения."""
+        return {
+            'last_query': self.entry.get_text().strip(),
+            'cat_general': str(self.btn_general.get_active()).lower(),
+            'cat_anime': str(self.btn_anime.get_active()).lower(),
+            'cat_people': str(self.btn_people.get_active()).lower(),
+            'purity_sfw': str(self.btn_sfw.get_active()).lower(),
+            'purity_sketchy': str(self.btn_sketchy.get_active()).lower(),
+            'purity_nsfw': str(self.btn_nsfw.get_active()).lower(),
+            'sort_index': str(self.sort_dropdown.get_selected()),
+            'resolution_index': str(self.res_dropdown.get_selected()), 
+            'ratio_index': str(self.ratio_dropdown.get_selected())       
+        }
+
+    def on_filter_changed(self, widget, *args):
+        search_state = self.get_current_search_state()
+        final_settings = {**self.settings, **search_state}
+        save_settings(final_settings)
+        self.settings = final_settings
+        self.start_new_search(self.entry.get_text().strip())
+
 
     def apply_settings(self, new_settings):
         old_cols = int(self.settings.get('columns', 4))
@@ -254,6 +377,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self.flowbox.set_min_children_per_line(new_cols)
         self.flowbox.set_max_children_per_line(new_cols)
         
+        # Обновляем состояние DropDown, если оно изменилось в результате сохранения настроек
+        self.res_dropdown.set_selected(int(self.settings.get('resolution_index', 0)))
+        self.ratio_dropdown.set_selected(int(self.settings.get('ratio_index', 0)))
+        self.sort_dropdown.set_selected(int(self.settings.get('sort_index', 5)))
+
         if old_cols != new_cols or old_key != new_settings['api_key']:
             self.start_new_search(self.current_query)
 
@@ -265,8 +393,10 @@ class MainWindow(Gtk.ApplicationWindow):
         if toggle_button.get_active() and not api_key:
             self.open_settings(None)
             toggle_button.set_active(False) 
+        
+        self.on_filter_changed(toggle_button)
 
-    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ ---
+    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ (ВОССТАНОВЛЕНО) ---
     def on_scroll_changed(self, adj):
         if self.is_loading or not self.has_more_pages:
             return
@@ -297,15 +427,29 @@ class MainWindow(Gtk.ApplicationWindow):
         else:
             p_sky = "0"
             p_nsf = "0"
+            if self.btn_sketchy.get_active(): self.btn_sketchy.set_active(False)
+            if self.btn_nsfw.get_active(): self.btn_nsfw.set_active(False)
 
         sort_idx = self.sort_dropdown.get_selected()
         sort_modes = ["relevance", "random", "date_added", "views", "favorites", "toplist", "hot"]
         sorting = sort_modes[sort_idx] if sort_idx < len(sort_modes) else "relevance"
+        
+        res_idx = self.res_dropdown.get_selected()
+        ratio_idx = self.ratio_dropdown.get_selected()
+        
+        selected_res = RESOLUTION_OPTIONS[res_idx][1]
+        selected_ratio = RATIO_OPTIONS[ratio_idx][1]
 
         params = {
             "q": query, "categories": f"{c_gen}{c_ani}{c_peo}", 
             "purity": f"{p_sfw}{p_sky}{p_nsf}", "sorting": sorting, "page": page
         }
+        
+        if selected_res:
+            params["resolutions"] = selected_res
+        if selected_ratio:
+            params["ratios"] = selected_ratio
+            
         if api_key: params["apikey"] = api_key
         return params
 
@@ -316,25 +460,32 @@ class MainWindow(Gtk.ApplicationWindow):
         loader.close()
         return loader.get_pixbuf()
 
+    # --- Остальные методы (без изменений) ---
+
     def load_thumbnail_async(self, thumb_url, full_url):
         def worker():
             try:
                 img_data = requests.get(thumb_url, timeout=10).content
                 pixbuf = self.load_pixbuf_from_bytes(img_data)
                 GLib.idle_add(self.add_thumbnail_to_ui, pixbuf, full_url)
-            except Exception as e:
+            except requests.exceptions.Timeout:
+                pass 
+            except Exception:
                 pass
+
         threading.Thread(target=worker, daemon=True).start()
 
     def add_thumbnail_to_ui(self, pixbuf, full_url):
         try:
             cols = int(self.settings.get('columns', 4))
             
-            available_width = 1050
-            target_width = (available_width // cols) - 12
+            win_width = self.get_width()
+            available_width = win_width - 20 
+            target_width = (available_width // cols) - 15 
             target_height = int(target_width * 0.66) 
-
+            
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+            
             picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.COVER)
             picture.set_size_request(target_width, target_height)
@@ -348,32 +499,38 @@ class MainWindow(Gtk.ApplicationWindow):
             
             button.connect("clicked", self.open_full_image, full_url)
             self.flowbox.append(button)
-        except Exception as e:
-            print(f"Err UI: {e}")
+        except Exception:
+            pass
 
     def open_full_image(self, widget, url):
         win = FullImageWindow(self, url, self.settings.get('download_path', ''))
         win.present()
 
     def on_search_clicked(self, widget):
-        self.start_new_search(self.entry.get_text().strip())
+        query = self.entry.get_text().strip()
+        
+        search_state = self.get_current_search_state()
+        final_settings = {**self.settings, **search_state}
+        save_settings(final_settings)
+        self.settings = final_settings
+        
+        self.start_new_search(query)
 
     def start_new_search(self, query):
         self.current_page = 1
         self.current_query = query
         self.has_more_pages = True
+        self.infobar.set_visible(False) 
         
         while True:
             child = self.flowbox.get_first_child()
             if child is None: break
             self.flowbox.remove(child)
         
-        # Центральный спиннер для первой загрузки
         self.center_spinner = Gtk.Spinner()
         self.center_spinner.set_size_request(32, 32)
         self.center_spinner.set_halign(Gtk.Align.CENTER)
         self.center_spinner.set_valign(Gtk.Align.CENTER)
-        # Используем тот же "трюк" с коробкой для безопасности
         box = Gtk.Box()
         box.set_halign(Gtk.Align.CENTER)
         box.append(self.center_spinner)
@@ -392,14 +549,12 @@ class MainWindow(Gtk.ApplicationWindow):
             params = self.get_api_params(query, page)
             try:
                 resp = requests.get(API_URL, params=params, timeout=10)
-                resp.raise_for_status()
+                resp.raise_for_status() 
                 data = resp.json().get("data", [])
                 meta = resp.json().get("meta", {})
                 
                 GLib.idle_add(self.stop_center_spinner)
 
-                if not data and page == 1: print("Пусто.")
-                
                 for w in data:
                     thumbs = w.get("thumbs", {})
                     thumb = thumbs.get("large") or thumbs.get("original")
@@ -412,8 +567,22 @@ class MainWindow(Gtk.ApplicationWindow):
                 
                 GLib.idle_add(self.on_api_response_ui, data, more_pages)
                 
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code
+                error_msg = f"Ошибка HTTP {status_code}: {'Слишком много запросов (429)' if status_code == 429 else 'API не найдено (404)' if status_code == 404 else 'Проверьте API ключ/запрос'}."
+                GLib.idle_add(self.show_infobar, error_msg)
+                GLib.idle_add(self.stop_center_spinner)
+                GLib.idle_add(self.on_api_response_ui, [], False)
+            except requests.exceptions.ConnectionError:
+                GLib.idle_add(self.show_infobar, "Ошибка соединения: Проверьте интернет или API URL.")
+                GLib.idle_add(self.stop_center_spinner)
+                GLib.idle_add(self.on_api_response_ui, [], False)
+            except requests.exceptions.Timeout:
+                GLib.idle_add(self.show_infobar, "Таймаут запроса: API не отвечает.")
+                GLib.idle_add(self.stop_center_spinner)
+                GLib.idle_add(self.on_api_response_ui, [], False)
             except Exception as e:
-                print("Err API:", e)
+                GLib.idle_add(self.show_infobar, f"Неизвестная ошибка: {e}")
                 GLib.idle_add(self.stop_center_spinner)
                 GLib.idle_add(self.on_api_response_ui, [], False)
 
@@ -421,7 +590,6 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def stop_center_spinner(self):
         if hasattr(self, 'center_spinner') and self.center_spinner.get_parent():
-            # Удаляем родительский Box, в котором лежит спиннер
             self.flowbox.remove(self.center_spinner.get_parent())
 
     def on_api_response_ui(self, data, has_more):
@@ -439,6 +607,8 @@ class MainWindow(Gtk.ApplicationWindow):
         if has_more and upper < (page_size * 1.5):
             self.load_next_page()
 
+
+# --- Окно полноразмерного изображения (без изменений) ---
 
 class FullImageWindow(Gtk.Window):
     def __init__(self, parent, image_url, download_path):
@@ -465,14 +635,12 @@ class FullImageWindow(Gtk.Window):
         self.picture.set_can_shrink(True) 
         overlay.set_child(self.picture)
 
-        # === ИСПРАВЛЕНИЕ: КОНТЕЙНЕР ДЛЯ СПИННЕРА ===
-        # Чтобы спиннер не раздувался на весь экран, кладем его в Box
         spinner_box = Gtk.Box()
         spinner_box.set_halign(Gtk.Align.CENTER)
         spinner_box.set_valign(Gtk.Align.CENTER)
         
         self.spinner = Gtk.Spinner()
-        self.spinner.set_size_request(32, 32) # Размер 32x32
+        self.spinner.set_size_request(32, 32)
         self.spinner.set_hexpand(False)
         self.spinner.set_vexpand(False)
         self.spinner.start()

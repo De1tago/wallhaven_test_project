@@ -10,7 +10,7 @@ import configparser
 API_URL = "https://wallhaven.cc/api/v1/search"
 CONFIG_FILE = "wallhaven_viewer.ini"
 
-# --- НОВЫЕ КОНСТАНТЫ ---
+# --- КОНСТАНТЫ (Без изменений) ---
 RESOLUTION_OPTIONS = [
     ("Любое", ""),
     ("1024x768 (XGA)", "1024x768"),
@@ -31,7 +31,7 @@ RATIO_OPTIONS = [
     ("32:9", "32x9"),
 ]
 
-# --- НАСТРОЙКИ ---
+# --- НАСТРОЙКИ (Без изменений) ---
 DEFAULT_SETTINGS = {
     'api_key': '',
     'download_path': '',
@@ -47,8 +47,6 @@ DEFAULT_SETTINGS = {
     'resolution_index': '0', 
     'ratio_index': '0'       
 }
-
-# --- Функции для настроек ---
 
 def load_settings():
     config = configparser.ConfigParser()
@@ -66,7 +64,7 @@ def save_settings(settings_dict):
     with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
-# --- Окно настроек ---
+# --- Окно настроек (Без изменений) ---
 
 class SettingsWindow(Gtk.Window):
     def __init__(self, parent):
@@ -156,7 +154,7 @@ class SettingsWindow(Gtk.Window):
         self.parent_window.apply_settings(final_settings)
         self.close()
 
-# --- Приложение ---
+# --- Приложение (Без изменений) ---
 
 class WallpaperViewer(Gtk.Application):
     def __init__(self):
@@ -166,6 +164,8 @@ class WallpaperViewer(Gtk.Application):
         win = MainWindow(self)
         win.present()
 
+
+# --- Главное окно (Измененный дизайн) ---
 
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
@@ -178,18 +178,41 @@ class MainWindow(Gtk.ApplicationWindow):
         self.current_query = self.settings['last_query']
         self.is_loading = False 
         self.has_more_pages = True
+        
+        # --- 1. HEADER BAR (Стандарт GNOME) ---
+        header = Gtk.HeaderBar()
+        self.set_titlebar(header)
 
-        # 1. Overlay
-        overlay = Gtk.Overlay()
-        self.set_child(overlay) 
+        # 1.1 Поле поиска (внутри HeaderBar, как Title Widget)
+        self.entry = Gtk.SearchEntry()
+        self.entry.set_placeholder_text("Поиск (оставьте пустым для топа)...")
+        self.entry.set_text(self.current_query) 
+        self.entry.set_hexpand(True)
+        self.entry.connect("activate", self.on_search_clicked)
+        header.set_title_widget(self.entry)
 
-        # 2. Основной вертикальный бокс
+        # 1.2 Кнопка поиска/обновления (слева в HeaderBar)
+        btn_search = Gtk.Button(icon_name="view-refresh-symbolic", label="Обновить")
+        btn_search.add_css_class("suggested-action")
+        btn_search.connect("clicked", self.on_search_clicked)
+        header.pack_start(btn_search) 
+
+        # 1.3 Кнопка настроек (справа в HeaderBar)
+        btn_settings = Gtk.Button(icon_name="preferences-system-symbolic")
+        btn_settings.set_tooltip_text("Настройки")
+        btn_settings.connect("clicked", self.open_settings)
+        header.pack_end(btn_settings) 
+
+        # --- 2. Основной контейнер с Overlay для InfoBar ---
         main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         main_vbox.set_margin_start(10)
         main_vbox.set_margin_end(10)
         main_vbox.set_margin_top(10)
         main_vbox.set_margin_bottom(10)
-        overlay.set_child(main_vbox) 
+        
+        overlay = Gtk.Overlay()
+        overlay.set_child(main_vbox)
+        self.set_child(overlay) 
         
         # --- Gtk.InfoBar для сообщений об ошибках ---
         self.infobar = Gtk.InfoBar()
@@ -197,8 +220,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.infobar.add_css_class("error") 
 
         self.infobar_label = Gtk.Label(label="Ошибка API")
-        
-        # Используем add_child для старых версий GTK4
         self.infobar.add_child(self.infobar_label) 
 
         self.infobar.add_button("Закрыть", Gtk.ResponseType.CLOSE)
@@ -209,26 +230,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.infobar.set_valign(Gtk.Align.START)
 
 
-        # Поиск
-        search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        main_vbox.append(search_box)
-
-        self.entry = Gtk.Entry()
-        self.entry.set_placeholder_text("Поиск (оставьте пустым для топа)...")
-        self.entry.set_text(self.current_query) 
-        self.entry.set_hexpand(True)
-        self.entry.connect("activate", self.on_search_clicked)
-        search_box.append(self.entry)
-
-        btn_search = Gtk.Button(label="Поиск / Обновить")
-        btn_search.connect("clicked", self.on_search_clicked)
-        search_box.append(btn_search)
-
-        # --- Фильтры ---
+        # --- 3. Фильтры (Один контейнер) ---
         filters_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
+        filters_box.set_halign(Gtk.Align.CENTER)
         main_vbox.append(filters_box)
 
-        # Категории
+        # Категории (Связанные кнопки: .linked)
         cat_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         cat_box.add_css_class("linked")
         filters_box.append(cat_box)
@@ -245,9 +252,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.btn_people.set_active(self.settings['cat_people'].lower() == 'true')
         cat_box.append(self.btn_people)
 
-        filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-
-        # Purity
+        # Purity (Связанные кнопки: .linked)
         purity_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         purity_box.add_css_class("linked")
         filters_box.append(purity_box)
@@ -265,8 +270,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.btn_nsfw.set_active(self.settings['purity_nsfw'].lower() == 'true')
         purity_box.append(self.btn_nsfw)
         self.btn_nsfw.connect("clicked", self.check_api_key_on_purity_change)
-
-        filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         
         # Разрешение
         filters_box.append(Gtk.Label(label="Разрешение:"))
@@ -288,8 +291,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.ratio_dropdown.connect("notify::selected", self.on_filter_changed)
         filters_box.append(self.ratio_dropdown)
         
-        filters_box.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
-
         # Сортировка
         filters_box.append(Gtk.Label(label="Сортировка:"))
         sort_options = Gtk.StringList()
@@ -301,18 +302,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.sort_dropdown.connect("notify::selected", self.on_filter_changed)
         filters_box.append(self.sort_dropdown)
         
-        btn_settings = Gtk.Button(icon_name="preferences-system-symbolic")
-        btn_settings.set_tooltip_text("Настройки")
-        btn_settings.connect("clicked", self.open_settings)
-        filters_box.append(btn_settings)
-
-        # Контент
+        # --- 4. Контент (FlowBox) ---
         self.scrolled = Gtk.ScrolledWindow()
         self.scrolled.set_vexpand(True)
         main_vbox.append(self.scrolled)
 
         self.v_adj = self.scrolled.get_vadjustment()
-        # ПОДКЛЮЧЕНИЕ МЕТОДА БЕСКОНЕЧНОГО СКРОЛЛА
         self.v_adj.connect("value-changed", self.on_scroll_changed)
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
@@ -348,7 +343,7 @@ class MainWindow(Gtk.ApplicationWindow):
         return cache_dir
     # --- КОНЕЦ МЕТОДОВ КЭШИРОВАНИЯ ---
 
-    # --- МЕТОД ДЛЯ ПОКАЗА ОШИБКИ ---
+    # --- МЕТОД ДЛЯ ПОКАЗА ОШИБКИ (Без изменений) ---
     def show_infobar(self, message):
         """Показывает сообщение об ошибке в Gtk.InfoBar и скрывает его через 5 секунд."""
         self.infobar_label.set_text(message)
@@ -356,7 +351,7 @@ class MainWindow(Gtk.ApplicationWindow):
         GLib.timeout_add_seconds(5, lambda: self.infobar.set_visible(False))
         return False
 
-    # --- Логика ---
+    # --- Логика (Без изменений) ---
 
     def get_current_search_state(self):
         """Собирает текущее состояние всех фильтров для сохранения."""
@@ -409,7 +404,7 @@ class MainWindow(Gtk.ApplicationWindow):
         
         self.on_filter_changed(toggle_button)
 
-    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ ---
+    # --- БЕСКОНЕЧНЫЙ СКРОЛЛ (Без изменений) ---
     def on_scroll_changed(self, adj):
         if self.is_loading or not self.has_more_pages:
             return
@@ -424,7 +419,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.current_page += 1
         self.load_wallpapers(self.current_query, self.current_page)
 
-    # --- ЗАПРОСЫ ---
+    # --- ЗАПРОСЫ (Без изменений) ---
 
     def get_api_params(self, query, page):
         c_gen = "1" if self.btn_general.get_active() else "0"
@@ -473,7 +468,7 @@ class MainWindow(Gtk.ApplicationWindow):
         loader.close()
         return loader.get_pixbuf()
 
-    # --- АСИНХРОННАЯ ЗАГРУЗКА МИНИАТЮРЫ (С КЭШИРОВАНИЕМ) ---
+    # --- АСИНХРОННАЯ ЗАГРУЗКА МИНИАТЮРЫ (С КЭШИРОВАНИЕМ) (Без изменений) ---
     def load_thumbnail_async(self, thumb_url, full_url):
         cache_dir = self.get_cache_dir()
         if not cache_dir:
@@ -658,7 +653,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.load_next_page()
 
 
-# --- Окно полноразмерного изображения (С ИСПРАВЛЕННЫМ ЗАГОЛОВКОМ) ---
+# --- Окно полноразмерного изображения (Без изменений) ---
 
 class FullImageWindow(Gtk.Window):
     def __init__(self, parent, image_url, download_path):
@@ -677,8 +672,8 @@ class FullImageWindow(Gtk.Window):
         self.save_btn = Gtk.Button(icon_name="document-save-symbolic")
         self.save_btn.set_sensitive(False)
         self.save_btn.set_tooltip_text("Сохранить изображение")
+        header.pack_end(self.save_btn) # Кнопка сохранения в HeaderBar (стандарт GNOME)
         self.save_btn.connect("clicked", self.on_save_clicked)
-        header.pack_end(self.save_btn)
 
         overlay = Gtk.Overlay()
         self.set_child(overlay)
@@ -701,23 +696,20 @@ class FullImageWindow(Gtk.Window):
         spinner_box.append(self.spinner)
         overlay.add_overlay(spinner_box)
 
-        # Выполняем загрузку изображения и информации параллельно
         threading.Thread(target=self.load_image_and_info, daemon=True).start()
 
     def load_image_and_info(self):
         """Загружает изображение и дополнительную информацию (для заголовка)"""
         
-        # 1. Загрузка информации об изображении для разрешения
-        resolution = "N/A"
+        resolution = "" 
         try:
             info_url = f"https://wallhaven.cc/api/v1/w/{self.wallpaper_id}"
             info_resp = requests.get(info_url, timeout=5).json()
-            resolution = info_resp.get("data", {}).get("resolution", "N/A")
+            resolution = info_resp.get("data", {}).get("resolution", "") 
             GLib.idle_add(self.update_title, resolution)
         except Exception:
             GLib.idle_add(self.update_title, resolution)
             
-        # 2. Загрузка самого изображения
         try:
             resp = requests.get(self.image_url, stream=True, timeout=60)
             resp.raise_for_status()
@@ -735,7 +727,13 @@ class FullImageWindow(Gtk.Window):
 
     def update_title(self, resolution):
         """Обновляет заголовок окна с ID и разрешением."""
-        title = f"Wallhaven - ID: {self.wallpaper_id} ({resolution})"
+        
+        if resolution:
+            res_str = f" ({resolution})"
+        else:
+            res_str = ""
+            
+        title = f"Wallhaven - ID: {self.wallpaper_id}{res_str}"
         self.set_title(title)
 
     def update_image(self, pixbuf):

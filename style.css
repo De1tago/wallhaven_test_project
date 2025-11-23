@@ -1,0 +1,23 @@
+.skeleton {
+    /* Основной цвет для скелета, обычно серый фон */
+    background-color: @theme_bg_color;
+    opacity: 0.5;
+    border-radius: 4px; /* Мягкие углы */
+    
+    /* Добавление анимации мерцания (пульсации) */
+    animation: skeleton-pulse 1.5s infinite alternate;
+}
+
+@keyframes skeleton-pulse {
+    0% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 0.8;
+    }
+}
+
+.thumbnail {
+    /* Дополнительный стиль для сетки */
+    margin: 5px; 
+}

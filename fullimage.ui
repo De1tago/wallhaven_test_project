@@ -5,31 +5,36 @@
     <property name="default-width">1000</property>
     <property name="default-height">700</property>
     <child>
-      <object class="GtkOverlay">
+      <object class="GtkScrolledWindow">
+        <property name="hscrollbar-policy">automatic</property>
+        <property name="vscrollbar-policy">automatic</property>
         <child>
-          <object class="GtkPicture" id="picture">
-            <property name="content-fit">contain</property>
-          </object>
-        </child>
-        <child type="overlay">
-          <object class="GtkBox" id="spinner_box">
+          <object class="GtkBox">
             <property name="orientation">vertical</property>
+            <property name="spacing">10</property>
             <property name="halign">center</property>
             <property name="valign">center</property>
-            <property name="spacing">10</property>
             <child>
-              <object class="GtkProgressBar" id="progress_bar">
+              <object class="GtkSpinner" id="spinner">
+                <property name="spinning">true</property>
+                <property name="width-request">64</property>
+                <property name="height-request">64</property>
                 <property name="halign">center</property>
-                <property name="show-text">true</property>
-                <property name="visible">false</property>
-                <property name="hexpand">false</property>
-                <property name="width-request">200</property>
               </object>
             </child>
             <child>
-              <object class="GtkSpinner" id="spinner">
-                <property name="width-request">32</property>
-                <property name="height-request">32</property>
+              <object class="GtkPicture" id="picture">
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="can-shrink">true</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkProgressBar" id="progress_bar">
+                <property name="visible">false</property>
+                <property name="width-request">300</property>
+                <property name="show-text">true</property>
+                <property name="halign">center</property>
               </object>
             </child>
           </object>
@@ -38,10 +43,24 @@
     </child>
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header_bar">
+        <child type="start">
+          <object class="GtkBox" orientation="horizontal">
+            <child>
+              <object class="GtkButton" id="set_wp_btn">
+                <property name="label">Установить обои</property>
+                <property name="icon-name">view-list-details-symbolic</property>
+                <property name="sensitive">false</property>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+            </child>
+          </object>
+        </child>
         <child type="end">
           <object class="GtkButton" id="save_btn">
+            <property name="label">Скачать</property>
             <property name="icon-name">document-save-symbolic</property>
-            <property name="tooltip-text">Сохранить изображение</property>
             <property name="sensitive">false</property>
           </object>
         </child>

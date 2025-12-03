@@ -5,13 +5,6 @@ Wallhaven Desktop Viewer
 
 Настольное приложение для просмотра и скачивания обоев с wallhaven.cc.
 Использует GTK 4 (PyGObject) для интерфейса и Requests для работы с API.
-
-Основные возможности:
-- Поиск по тегам
-- Фильтрация по категориям, чистоте (SFW/NSFW), разрешению и соотношению сторон
-- Бесконечная прокрутка
-- Кэширование миниатюр
-- Адаптивный дизайн
 """
 
 import gi
@@ -23,6 +16,7 @@ import os
 import configparser
 import sys
 import traceback
+import glob
 
 API_URL = "https://wallhaven.cc/api/v1/search"
 CONFIG_FILE = "wallhaven_viewer.ini"
@@ -31,13 +25,6 @@ CONFIG_FILE = "wallhaven_viewer.ini"
 def resolve_path(filename):
     """
     Возвращает абсолютный путь к файлу относительно расположения скрипта.
-    Это необходимо для корректной загрузки ресурсов (.ui, .css) при запуске из любой директории.
-    
-    Args:
-        filename (str): Имя файла (например, 'style.css').
-        
-    Returns:
-        str: Абсолютный путь к файлу.
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_dir, filename)
@@ -63,6 +50,7 @@ RATIO_OPTIONS = [
     ("32:9", "32x9"),
 ]
 SORT_OPTIONS = ["Relevance", "Random", "Date Added", "Views", "Favorites", "Toplist", "Hot"]
+# ------------------------------------------------------------------------
 
 # --- НАСТРОЙКИ ---
 DEFAULT_SETTINGS = {
@@ -191,6 +179,7 @@ class SettingsWindow(Gtk.Window):
 
         save_settings(final_settings)
         self.parent_window.apply_settings(final_settings)
+        self.parent_window.scan_downloaded_wallpapers() 
         self.close()
 
 # --- Приложение ---
@@ -226,6 +215,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.current_query = self.settings['last_query']
         self.is_loading = False 
         self.has_more_pages = True
+        
+        self.downloaded_ids = set() 
+        self.is_downloaded_mode = False 
 
         # ЗАГРУЗКА UI
         ui_path = resolve_path("mainwindow.ui")
@@ -236,13 +228,11 @@ class MainWindow(Gtk.ApplicationWindow):
         builder = Gtk.Builder.new_from_file(ui_path)
         xml_window = builder.get_object("main_window")
         
-        # Перенос HeaderBar
         header_bar = builder.get_object("header_bar")
         if header_bar:
             xml_window.set_titlebar(None)
             self.set_titlebar(header_bar)
 
-        # Перенос контента
         content = xml_window.get_child()
         if content:
             xml_window.set_child(None)
@@ -267,9 +257,11 @@ class MainWindow(Gtk.ApplicationWindow):
         self.flowbox = builder.get_object("flowbox")
         self.bottom_spinner = builder.get_object("bottom_spinner")
         
+        self.btn_downloaded = builder.get_object("btn_downloaded")
+        
         self.flowbox.set_valign(Gtk.Align.START)
         
-        # Настройка виджетов из настроек
+        # Настройка виджетов
         self.entry.set_text(self.current_query) 
         self.btn_general.set_active(self.settings['cat_general'].lower() == 'true')
         self.btn_anime.set_active(self.settings['cat_anime'].lower() == 'true')
@@ -293,6 +285,7 @@ class MainWindow(Gtk.ApplicationWindow):
         # Подключение сигналов
         self.btn_search.connect("clicked", self.on_search_clicked)
         self.btn_settings.connect("clicked", self.open_settings)
+        self.btn_downloaded.connect("clicked", self.on_downloaded_toggle) 
         
         btn_infobar_close = builder.get_object("btn_infobar_close")
         if btn_infobar_close:
@@ -312,15 +305,48 @@ class MainWindow(Gtk.ApplicationWindow):
         self.flowbox.set_min_children_per_line(cols)
         self.flowbox.set_max_children_per_line(cols)
         
+        # --- ЗАПУСК ---
+        self.scan_downloaded_wallpapers() 
         self.start_new_search(self.current_query)
+        
+    def scan_downloaded_wallpapers(self):
+        """
+        Сканирует папку для загрузок и обновляет список self.downloaded_ids.
+        """
+        self.downloaded_ids.clear()
+        download_path = self.settings.get('download_path', '')
+        
+        if not download_path or not os.path.isdir(download_path):
+            return
+
+        for ext in ['*.jpg', '*.png', '*.jpeg']:
+            # Используем os.path.join и glob.glob для безопасности
+            for file_path in glob.glob(os.path.join(download_path, ext)):
+                filename = os.path.basename(file_path)
+                # ID - это часть имени до первой точки
+                wallpaper_id = filename.split('.')[0] 
+                if wallpaper_id:
+                    self.downloaded_ids.add(wallpaper_id)
+        
+        print(f"Найдено скачанных обоев: {len(self.downloaded_ids)}")
+        
+    def on_downloaded_toggle(self, btn):
+        """
+        Обработчик кнопки "Только скачанные".
+        """
+        self.is_downloaded_mode = btn.get_active()
+        self.entry.set_sensitive(not self.is_downloaded_mode)
+        
+        if self.is_downloaded_mode:
+            self.show_infobar("Отображаются только скачанные обои. Фильтры временно отключены.")
+            self.current_query = ""
+        else:
+            self.current_query = self.settings.get('last_query', '')
+            
+        self.start_new_search(self.current_query)
+        
 
     def get_thumbnail_size(self):
-        """
-        Рассчитывает размер миниатюры для текущего размера окна.
-        
-        Returns:
-            tuple: (width, height) в пикселях.
-        """
         cols = int(self.settings.get('columns', 4))
         win_width = self.get_width()
         if win_width <= 1: win_width = 1200 
@@ -330,8 +356,11 @@ class MainWindow(Gtk.ApplicationWindow):
         target_height = int(target_width * 0.66)
         return target_width, target_height
 
-    def on_infobar_close_clicked(self, button):
-        self.infobar.set_visible(False)
+    def show_infobar(self, message):
+        """Отображает сообщение об ошибке пользователю."""
+        self.infobar_label.set_text(message)
+        self.infobar.set_visible(True) 
+        GLib.timeout_add_seconds(5, lambda: self.infobar.set_visible(False))
         return False
         
     def get_cache_dir(self):
@@ -345,15 +374,11 @@ class MainWindow(Gtk.ApplicationWindow):
                 return None
         return cache_dir
 
-    def show_infobar(self, message):
-        """Отображает сообщение об ошибке пользователю."""
-        self.infobar_label.set_text(message)
-        self.infobar.set_visible(True) 
-        GLib.timeout_add_seconds(5, lambda: self.infobar.set_visible(False))
+    def on_infobar_close_clicked(self, button):
+        self.infobar.set_visible(False)
         return False
-    
+        
     def get_current_search_state(self):
-        """Возвращает текущее состояние фильтров."""
         return {
             'last_query': self.entry.get_text().strip(),
             'cat_general': str(self.btn_general.get_active()).lower(),
@@ -368,7 +393,6 @@ class MainWindow(Gtk.ApplicationWindow):
         }
 
     def on_filter_changed(self, widget, *args):
-        """Обработчик изменения фильтров."""
         search_state = self.get_current_search_state()
         final_settings = {**self.settings, **search_state}
         save_settings(final_settings)
@@ -376,7 +400,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.start_new_search(self.entry.get_text().strip())
 
     def apply_settings(self, new_settings):
-        """Применяет новые настройки."""
         old_cols = int(self.settings.get('columns', 4))
         old_key = self.settings.get('api_key', '')
         self.settings = new_settings
@@ -403,7 +426,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.on_filter_changed(toggle_button)
         
     def on_scroll_changed(self, adj):
-        if self.is_loading or not self.has_more_pages:
+        if self.is_loading or not self.has_more_pages or self.is_downloaded_mode: 
             return
         current_pos = adj.get_value() + adj.get_page_size()
         max_height = adj.get_upper()
@@ -415,7 +438,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.load_wallpapers(self.current_query, self.current_page)
         
     def get_api_params(self, query, page):
-        """Формирует параметры для API-запроса."""
         c_gen = "1" if self.btn_general.get_active() else "0"
         c_ani = "1" if self.btn_anime.get_active() else "0"
         c_peo = "1" if self.btn_people.get_active() else "0"
@@ -460,15 +482,11 @@ class MainWindow(Gtk.ApplicationWindow):
             print(f"Ошибка создания Pixbuf: {e}")
             return None
     
-    # === АСИНХРОННАЯ ЗАГРУЗКА ДЛЯ УМНОЙ ЗАГЛУШКИ ===
-    def load_thumbnail_async(self, placeholder_btn, thumb_url):
-        """
-        Загружает миниатюру в фоне и обновляет переданную кнопку-заглушку.
-        """
+    def load_thumbnail_async(self, placeholder_btn, thumb_url, full_url, wallpaper_id): 
+        """Загружает миниатюру в фоне и обновляет переданную кнопку-заглушку."""
         cache_dir = self.get_cache_dir()
         if not cache_dir:
             cache_path = None
-            filename = None
         else:
             filename = thumb_url.split('/')[-1]
             cache_path = os.path.join(cache_dir, filename)
@@ -493,8 +511,8 @@ class MainWindow(Gtk.ApplicationWindow):
                         except Exception: pass
                 except Exception as e:
                     print(f"Ошибка загрузки {thumb_url}: {e}")
-                    # Удаляем заглушку при ошибке
-                    GLib.idle_add(lambda: self.flowbox.remove(placeholder_btn))
+                    # !!! ИСПРАВЛЕНИЕ: Показываем заглушку при ошибке
+                    GLib.idle_add(self.show_error_indicator, placeholder_btn, wallpaper_id)
                     return 
 
             # 3. Обновление UI
@@ -502,40 +520,100 @@ class MainWindow(Gtk.ApplicationWindow):
                 try:
                     pixbuf = self.load_pixbuf_from_bytes(img_data)
                     if pixbuf:
-                        GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf)
+                        GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf, wallpaper_id)
                 except Exception as e:
                     print(f"Ошибка: {e}")
 
         threading.Thread(target=worker, daemon=True).start()
     
-    # === ОБНОВЛЕНИЕ ЗАГЛУШКИ ===
-    def update_thumbnail_ui(self, btn, pixbuf):
+    def update_thumbnail_ui(self, btn, pixbuf, wallpaper_id): 
         """Заменяет содержимое заглушки на загруженное изображение."""
         try:
-            # Очистка
             btn.set_child(None)
             btn.remove_css_class("skeleton")
             
-            # Адаптивный размер (hexpand делает магию)
-            # Мы не задаем жесткий размер, а позволяем FlowBox управлять им
+            if wallpaper_id in self.downloaded_ids:
+                btn.add_css_class("downloaded") 
+                
             btn.set_hexpand(True) 
-            btn.set_vexpand(False) # Высота зависит от ширины (см. ниже)
+            btn.set_vexpand(False) 
             
-            # Получаем примерную ширину для ratio (не обязательно, но полезно)
             target_width, target_height = self.get_thumbnail_size()
             
+            overlay = Gtk.Overlay()
+
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
             picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.COVER)
-            # Минимальный размер, чтобы картинка не схлопнулась
             picture.set_size_request(-1, target_height) 
             
-            btn.set_child(picture)
+            overlay.set_child(picture)
+            
+            # Добавляем значок (если скачано)
+            if wallpaper_id in self.downloaded_ids:
+                icon = Gtk.Image.new_from_icon_name("media-floppy-symbolic") 
+                icon.add_css_class("download-indicator") 
+                icon.set_halign(Gtk.Align.END)
+                icon.set_valign(Gtk.Align.END)
+                icon.set_margin_end(10)
+                icon.set_margin_bottom(10)
+                overlay.add_overlay(icon)
+
+            btn.set_child(overlay)
         except Exception as e:
             print(f"Ошибка обновления UI: {e}")
 
+    # !!! НОВЫЙ МЕТОД ДЛЯ ОТОБРАЖЕНИЯ ОШИБКИ
+    def show_error_indicator(self, btn, wallpaper_id):
+        """
+        Показывает заглушку, если миниатюра недоступна, но обои скачаны.
+        """
+        try:
+            btn.set_child(None)
+            btn.remove_css_class("skeleton")
+            
+            target_width, target_height = self.get_thumbnail_size()
+
+            # Создаем контейнер-заглушку
+            error_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+            error_box.set_size_request(-1, target_height) 
+            error_box.set_halign(Gtk.Align.CENTER)
+            error_box.set_valign(Gtk.Align.CENTER)
+            
+            # Иконка, показывающая, что файл скачан локально
+            icon = Gtk.Image.new_from_icon_name("media-floppy-symbolic") 
+            icon.add_css_class("download-indicator") 
+            icon.set_icon_size(Gtk.IconSize.LARGE)
+            
+            # Текст (ID файла и сообщение)
+            label = Gtk.Label(label=f"ID: {wallpaper_id}\n(Нет миниатюры)", use_markup=False)
+            label.add_css_class("dim-label")
+
+            error_box.append(icon)
+            error_box.append(label)
+
+            # Добавляем зеленую рамку, так как файл скачан
+            if wallpaper_id in self.downloaded_ids:
+                btn.add_css_class("downloaded") 
+
+            btn.set_child(error_box)
+        except Exception as e:
+             print(f"Критическая ошибка при создании индикатора ошибки: {e}")
+
     def open_full_image(self, widget, url):
-        win = FullImageWindow(self, url, self.settings.get('download_path', ''))
+        wallpaper_id = url.split('/')[-1].split('.')[0]
+        # Проверяем, скачан ли файл локально, чтобы передать путь в FullImageWindow
+        local_path = None
+        if wallpaper_id in self.downloaded_ids:
+            download_path = self.settings.get('download_path', '')
+            if download_path:
+                for ext in ['.jpg', '.png', '.jpeg']:
+                    path = os.path.join(download_path, wallpaper_id + ext)
+                    if os.path.exists(path):
+                        local_path = path
+                        break
+        
+        win = FullImageWindow(self, url, self.settings.get('download_path', ''), local_path) 
         win.present()
 
     def on_search_clicked(self, widget):
@@ -546,20 +624,22 @@ class MainWindow(Gtk.ApplicationWindow):
         self.settings = final_settings
         self.start_new_search(query)
         
-    def create_placeholder_btn(self, full_url):
+    def create_placeholder_btn(self, full_url, wallpaper_id): 
         """Создает кнопку-заглушку (скелет)."""
         width, height = self.get_thumbnail_size()
         
         btn = Gtk.Button()
-        # Начальный размер
         btn.set_size_request(-1, height)
-        btn.set_hexpand(True) # Растягиваем по ширине
+        btn.set_hexpand(True)
         
         btn.set_margin_start(5)
         btn.set_margin_end(5)
         btn.set_margin_top(5)
         btn.set_margin_bottom(5)
         
+        if wallpaper_id in self.downloaded_ids:
+             btn.add_css_class("downloaded") 
+
         btn.add_css_class("skeleton")
         btn.add_css_class("thumbnail")
         
@@ -569,7 +649,6 @@ class MainWindow(Gtk.ApplicationWindow):
         s.set_valign(Gtk.Align.CENTER)
         btn.set_child(s)
         
-        # Подключаем клик сразу
         btn.connect("clicked", self.open_full_image, full_url)
         
         return btn
@@ -577,10 +656,9 @@ class MainWindow(Gtk.ApplicationWindow):
     def start_new_search(self, query):
         self.current_page = 1
         self.current_query = query
-        self.has_more_pages = True
+        self.has_more_pages = not self.is_downloaded_mode 
         self.infobar.set_visible(False) 
         
-        # Полная очистка
         while True:
             child = self.flowbox.get_first_child()
             if child is None: break
@@ -590,6 +668,24 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def load_wallpapers(self, query, page):
         self.is_loading = True
+        
+        if self.is_downloaded_mode:
+            # === РЕЖИМ "ТОЛЬКО СКАЧАННЫЕ" (БИБЛИОТЕКА) ===
+            self.bottom_spinner.set_visible(False)
+            items_to_add = []
+            
+            for w_id in self.downloaded_ids:
+                # Генерируем URL для миниатюры (может не существовать!)
+                full_url = f"https://w.wallhaven.cc/full/{w_id[0:2]}/wallhaven-{w_id}.jpg"
+                thumb_url = f"https://th.wallhaven.cc/lg/th/{w_id[0:2]}/{w_id}.jpg" 
+                items_to_add.append((thumb_url, full_url, w_id))
+
+            GLib.idle_add(self.create_placeholders_and_load, items_to_add)
+            GLib.idle_add(self.finish_loading_page, False)
+            self.is_loading = False
+            return
+            
+        # === РЕЖИМ API-ПОИСКА ===
         if page > 1:
             self.bottom_spinner.set_visible(True)
             self.bottom_spinner.start()
@@ -605,16 +701,15 @@ class MainWindow(Gtk.ApplicationWindow):
                 if not data and page == 1:
                      GLib.idle_add(self.show_infobar, "Ничего не найдено")
 
-                # Подготовка данных для UI
                 items_to_add = []
                 for w in data:
                     thumbs = w.get("thumbs", {})
                     thumb = thumbs.get("large") or thumbs.get("original")
                     full = w.get("path")
-                    if thumb and full:
-                        items_to_add.append((thumb, full))
+                    w_id = w.get("id") 
+                    if thumb and full and w_id:
+                        items_to_add.append((thumb, full, w_id)) 
                 
-                # Создаем заглушки
                 GLib.idle_add(self.create_placeholders_and_load, items_to_add)
 
                 last_page = meta.get("last_page", 1)
@@ -629,10 +724,10 @@ class MainWindow(Gtk.ApplicationWindow):
     
     def create_placeholders_and_load(self, items):
         """Создает заглушки и запускает загрузку."""
-        for thumb_url, full_url in items:
-            btn = self.create_placeholder_btn(full_url)
+        for thumb_url, full_url, wallpaper_id in items: 
+            btn = self.create_placeholder_btn(full_url, wallpaper_id) 
             self.flowbox.append(btn)
-            self.load_thumbnail_async(btn, thumb_url)
+            self.load_thumbnail_async(btn, thumb_url, full_url, wallpaper_id) 
 
     def finish_loading_page(self, has_more):
         self.is_loading = False
@@ -645,10 +740,12 @@ class MainWindow(Gtk.ApplicationWindow):
 class FullImageWindow(Gtk.Window):
     """Окно просмотра полноразмерного изображения."""
     
-    def __init__(self, parent, image_url, download_path):
+    def __init__(self, parent, image_url, download_path, local_path=None):
         super().__init__(transient_for=parent)
+        self.parent_window = parent 
         self.image_url = image_url
         self.download_path = download_path
+        self.local_path = local_path 
         self.image_data = None
         self.wallpaper_id = image_url.split('/')[-1].split('.')[0]
         
@@ -675,9 +772,19 @@ class FullImageWindow(Gtk.Window):
         self.save_btn = builder.get_object("save_btn")
         self.progress_bar = builder.get_object("progress_bar")
         
-        self.save_btn.connect("clicked", self.on_save_clicked)
+        self.set_wp_btn = builder.get_object("set_wp_btn") 
 
-        threading.Thread(target=self.load_image_and_info, daemon=True).start()
+        self.save_btn.connect("clicked", self.on_save_clicked)
+        self.set_wp_btn.connect("clicked", self.on_set_wallpaper_clicked) 
+        
+        if self.local_path:
+            self.load_image_and_info(local_mode=True)
+            self.set_wp_btn.set_sensitive(True) 
+            self.save_btn.set_sensitive(False) 
+            self.save_btn.add_css_class("suggested-action")
+            self.save_btn.set_label("Скачано")
+        else:
+            threading.Thread(target=self.load_image_and_info, daemon=True).start()
 
     def update_progress(self, current_bytes, total_bytes):
         if total_bytes > 0:
@@ -689,44 +796,65 @@ class FullImageWindow(Gtk.Window):
             self.spinner.stop()
             self.spinner.set_visible(False)
 
-    def load_image_and_info(self):
+    def load_image_and_info(self, local_mode=False):
         resolution = "" 
-        try:
-            info_url = f"https://wallhaven.cc/api/v1/w/{self.wallpaper_id}"
-            info_resp = requests.get(info_url, timeout=5).json()
-            resolution = info_resp.get("data", {}).get("resolution", "") 
-            GLib.idle_add(self.update_title, resolution)
-        except Exception:
-            GLib.idle_add(self.update_title, resolution)
+        
+        # 1. Загрузка данных (API или локально)
+        if local_mode and self.local_path:
+            try:
+                with open(self.local_path, "rb") as f:
+                    self.image_data = f.read()
+                GLib.idle_add(self.update_title, resolution)
+            except Exception as e:
+                print(f"Ошибка чтения локального файла: {e}")
+                self.image_data = None
+        else:
+            # Запрос API для разрешения
+            try:
+                info_url = f"https://wallhaven.cc/api/v1/w/{self.wallpaper_id}"
+                info_resp = requests.get(info_url, timeout=5).json()
+                resolution = info_resp.get("data", {}).get("resolution", "") 
+                GLib.idle_add(self.update_title, resolution)
+            except Exception:
+                GLib.idle_add(self.update_title, resolution)
+                
+            # Загрузка по сети
+            try:
+                resp = requests.get(self.image_url, stream=True, timeout=60)
+                resp.raise_for_status()
+                
+                total_bytes = int(resp.headers.get('content-length', 0))
+                current_bytes = 0
+                self.image_data = b''
+                
+                if total_bytes == 0:
+                    GLib.idle_add(self.spinner.start)
+                else:
+                    GLib.idle_add(self.update_progress, 0, total_bytes) 
+                
+                for chunk in resp.iter_content(chunk_size=8192):
+                    self.image_data += chunk
+                    current_bytes += len(chunk)
+                    if total_bytes > 0:
+                        GLib.idle_add(self.update_progress, current_bytes, total_bytes)
             
-        try:
-            resp = requests.get(self.image_url, stream=True, timeout=60)
-            resp.raise_for_status()
-            
-            total_bytes = int(resp.headers.get('content-length', 0))
-            current_bytes = 0
-            self.image_data = b''
-            
-            if total_bytes == 0:
-                GLib.idle_add(self.spinner.start)
-            else:
-                GLib.idle_add(self.update_progress, 0, total_bytes) 
-            
-            for chunk in resp.iter_content(chunk_size=8192):
-                self.image_data += chunk
-                current_bytes += len(chunk)
-                if total_bytes > 0:
-                    GLib.idle_add(self.update_progress, current_bytes, total_bytes)
-            
-            loader = GdkPixbuf.PixbufLoader()
-            loader.write(self.image_data)
-            loader.close()
-            pixbuf = loader.get_pixbuf()
-            GLib.idle_add(self.update_image, pixbuf)
-            
-        except Exception:
+            except Exception:
+                GLib.idle_add(self.spinner.stop)
+                GLib.idle_add(lambda: self.progress_bar.set_visible(False))
+                self.image_data = None
+
+
+        # 2. Обновление UI
+        if self.image_data:
+            try:
+                pixbuf = MainWindow.load_pixbuf_from_bytes(self.image_data)
+                if pixbuf:
+                    GLib.idle_add(self.update_image, pixbuf)
+            except Exception as e:
+                print(f"Ошибка: {e}")
+        else:
             GLib.idle_add(self.spinner.stop)
-            GLib.idle_add(lambda: self.progress_bar.set_visible(False))
+
 
     def update_title(self, resolution):
         if resolution: res_str = f" ({resolution})"
@@ -739,17 +867,32 @@ class FullImageWindow(Gtk.Window):
         self.spinner.stop()
         self.spinner.set_visible(False)
         self.progress_bar.set_visible(False)
-        self.save_btn.set_sensitive(True)
+        
+        if not self.local_path:
+            self.save_btn.set_sensitive(True)
+        self.set_wp_btn.set_sensitive(True) 
 
     def on_save_clicked(self, btn):
         if not self.image_data: return
-        name = self.image_url.split("/")[-1]
+        
+        content_type = GdkPixbuf.PixbufFormat.identify(self.image_data).get_name()
+        ext = '.jpg' if 'jpeg' in content_type else '.png'
+        name = self.wallpaper_id + ext
+
         if self.download_path and os.path.exists(self.download_path):
             try:
-                with open(os.path.join(self.download_path, name), "wb") as f:
+                local_path = os.path.join(self.download_path, name)
+                with open(local_path, "wb") as f:
                     f.write(self.image_data)
-                self.save_btn.set_icon_name("object-select-symbolic")
-                GLib.timeout_add(1500, lambda: self.save_btn.set_icon_name("document-save-symbolic"))
+                    
+                self.local_path = local_path 
+                self.save_btn.set_label("Скачано")
+                self.save_btn.set_sensitive(False)
+                self.set_wp_btn.set_sensitive(True)
+                
+                self.parent_window.scan_downloaded_wallpapers() 
+                self.parent_window.flowbox.invalidate_filter() 
+                
             except Exception: self.open_dialog(name)
         else: self.open_dialog(name)
 
@@ -762,8 +905,42 @@ class FullImageWindow(Gtk.Window):
         try:
             f = d.save_finish(res)
             if f:
-                with open(f.get_path(), "wb") as file: file.write(self.image_data)
+                local_path = f.get_path()
+                with open(local_path, "wb") as file: file.write(self.image_data)
+                
+                self.local_path = local_path
+                self.save_btn.set_label("Скачано")
+                self.save_btn.set_sensitive(False)
+                self.set_wp_btn.set_sensitive(True)
+                
+                self.parent_window.scan_downloaded_wallpapers()
+                self.parent_window.flowbox.invalidate_filter()
+                
         except Exception: pass
+        
+    def on_set_wallpaper_clicked(self, btn):
+        """
+        Устанавливает изображение в качестве обоев рабочего стола.
+        """
+        if self.local_path:
+            try:
+                threading.Thread(target=self._set_wallpaper_worker, args=(self.local_path,), daemon=True).start()
+                btn.set_icon_name("object-select-symbolic")
+                GLib.timeout_add(1500, lambda: btn.set_icon_name("view-list-details-symbolic"))
+                
+            except Exception as e:
+                print(f"Ошибка установки обоев: {e}")
+
+    def _set_wallpaper_worker(self, path):
+        """Рабочий поток для установки обоев (использует GIO/GSettings)."""
+        try:
+            uri = Gio.File.new_for_path(path).get_uri()
+            settings = Gio.Settings.new('org.gnome.desktop.background')
+            settings.set_string('picture-uri', uri)
+            settings.set_string('picture-uri-dark', uri)
+        except Exception as e:
+            print(f"Ошибка в потоке установки обоев: {e}")
+
 
 if __name__ == "__main__":
     app = WallpaperViewer()

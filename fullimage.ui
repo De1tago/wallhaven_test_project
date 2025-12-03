@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <object class="GtkWindow" id="full_image_window">
+    <property name="default-width">1000</property>
+    <property name="default-height">700</property>
+    <child>
+      <object class="GtkOverlay">
+        <child>
+          <object class="GtkPicture" id="picture">
+            <property name="content-fit">contain</property>
+          </object>
+        </child>
+        <child type="overlay">
+          <object class="GtkBox" id="spinner_box">
+            <property name="orientation">vertical</property>
+            <property name="halign">center</property>
+            <property name="valign">center</property>
+            <property name="spacing">10</property>
+            <child>
+              <object class="GtkProgressBar" id="progress_bar">
+                <property name="halign">center</property>
+                <property name="show-text">true</property>
+                <property name="visible">false</property>
+                <property name="hexpand">false</property>
+                <property name="width-request">200</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkSpinner" id="spinner">
+                <property name="width-request">32</property>
+                <property name="height-request">32</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header_bar">
+        <child type="end">
+          <object class="GtkButton" id="save_btn">
+            <property name="icon-name">document-save-symbolic</property>
+            <property name="tooltip-text">Сохранить изображение</property>
+            <property name="sensitive">false</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

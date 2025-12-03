@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""
+Wallhaven Desktop Viewer
+========================
+
+Настольное приложение для просмотра и скачивания обоев с wallhaven.cc.
+Использует GTK 4 (PyGObject) для интерфейса и Requests для работы с API.
+
+Основные возможности:
+- Поиск по тегам
+- Фильтрация по категориям, чистоте (SFW/NSFW), разрешению и соотношению сторон
+- Бесконечная прокрутка
+- Кэширование миниатюр
+- Адаптивный дизайн
+"""
+
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GdkPixbuf, GLib, Gdk, Gio, GObject
@@ -10,19 +25,17 @@ import sys
 import traceback
 
 API_URL = "https://wallhaven.cc/api/v1/search"
-"""str: Базовый URL API Wallhaven для поиска обоев."""
-
 CONFIG_FILE = "wallhaven_viewer.ini"
-"""str: Имя файла конфигурации приложения."""
 
 # --- ХЕЛПЕР ДЛЯ ПУТЕЙ ---
 def resolve_path(filename):
     """
-    Преобразует относительный путь в абсолютный на основе расположения скрипта.
-
+    Возвращает абсолютный путь к файлу относительно расположения скрипта.
+    Это необходимо для корректной загрузки ресурсов (.ui, .css) при запуске из любой директории.
+    
     Args:
-        filename (str): Имя файла или путь относительно директории скрипта.
-
+        filename (str): Имя файла (например, 'style.css').
+        
     Returns:
         str: Абсолютный путь к файлу.
     """
@@ -40,8 +53,6 @@ RESOLUTION_OPTIONS = [
     ("5120x2880 (5K)", "5120x2880"),
     ("7680x4320 (8K)", "7680x4320"),
 ]
-"""list[tuple[str, str]]: Список доступных разрешений для фильтрации с отображаемыми метками и значениями запроса."""
-
 RATIO_OPTIONS = [
     ("Любое", ""),
     ("16:9", "16x9"),
@@ -51,10 +62,7 @@ RATIO_OPTIONS = [
     ("21:9", "21x9"),
     ("32:9", "32x9"),
 ]
-"""list[tuple[str, str]]: Список доступных соотношений сторон с метками и значениями запроса."""
-
 SORT_OPTIONS = ["Relevance", "Random", "Date Added", "Views", "Favorites", "Toplist", "Hot"]
-"""list[str]: Список вариантов сортировки результатов поиска."""
 
 # --- НАСТРОЙКИ ---
 DEFAULT_SETTINGS = {
@@ -72,18 +80,9 @@ DEFAULT_SETTINGS = {
     'resolution_index': '0', 
     'ratio_index': '0'       
 }
-"""dict: Словарь значений настроек по умолчанию."""
 
 def load_settings():
-    """
-    Загружает настройки из INI-файла конфигурации.
-
-    Если файл или секция не найдены, возвращает значения по умолчанию.
-    Поддерживает только ключи из DEFAULT_SETTINGS.
-
-    Returns:
-        dict: Словарь загруженных настроек.
-    """
+    """Загружает настройки из INI-файла или создает дефолтные."""
     config = configparser.ConfigParser()
     config.read(resolve_path(CONFIG_FILE))
     settings = DEFAULT_SETTINGS.copy()
@@ -94,14 +93,7 @@ def load_settings():
     return settings
 
 def save_settings(settings_dict):
-    """
-    Сохраняет настройки в INI-файл конфигурации.
-
-    Сохраняет только ключи, присутствующие в DEFAULT_SETTINGS.
-
-    Args:
-        settings_dict (dict): Словарь настроек для сохранения.
-    """
+    """Сохраняет переданный словарь настроек в INI-файл."""
     config = configparser.ConfigParser()
     config['Settings'] = {k: v for k, v in settings_dict.items() if k in DEFAULT_SETTINGS}
     with open(resolve_path(CONFIG_FILE), 'w') as configfile:
@@ -109,27 +101,9 @@ def save_settings(settings_dict):
 
 # --- SettingsWindow ---
 class SettingsWindow(Gtk.Window):
-    """
-    Окно настройки параметров приложения.
-
-    Позволяет пользователю задать API-ключ, путь сохранения, количество колонок и сохранить их.
-    Окно модальное и привязано к родительскому окну.
-
-    Attributes:
-        parent_window (MainWindow): Родительское окно приложения.
-        current_settings (dict): Текущие настройки, загруженные при открытии.
-        entry_api (Gtk.Entry): Поле ввода для API-ключа.
-        entry_path (Gtk.Entry): Поле ввода для пути сохранения.
-        spin_cols (Gtk.SpinButton): Элемент выбора количества колонок.
-    """
+    """Окно настроек приложения."""
     
     def __init__(self, parent):
-        """
-        Инициализирует окно настроек.
-
-        Args:
-            parent (MainWindow): Родительское окно, к которому привязано данное окно.
-        """
         super().__init__(title="Настройки")
         self.set_modal(True)
         self.set_transient_for(parent)
@@ -145,6 +119,7 @@ class SettingsWindow(Gtk.Window):
         vbox.set_margin_bottom(20)
         self.set_child(vbox)
         
+        # API Key
         vbox.append(Gtk.Label(label="<b>API Ключ (для NSFW):</b>", use_markup=True, xalign=0))
         self.entry_api = Gtk.Entry()
         self.entry_api.set_text(self.current_settings['api_key'])
@@ -152,6 +127,7 @@ class SettingsWindow(Gtk.Window):
 
         vbox.append(Gtk.Separator())
 
+        # Путь сохранения
         vbox.append(Gtk.Label(label="<b>Папка для сохранения:</b>", use_markup=True, xalign=0))
         hbox_path = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         vbox.append(hbox_path)
@@ -173,6 +149,7 @@ class SettingsWindow(Gtk.Window):
 
         vbox.append(Gtk.Separator())
 
+        # Колонки
         hbox_cols = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         vbox.append(hbox_cols)
         hbox_cols.append(Gtk.Label(label="Колонок в сетке:", xalign=0))
@@ -189,27 +166,12 @@ class SettingsWindow(Gtk.Window):
         vbox.append(btn_save)
 
     def on_select_folder(self, btn):
-        """
-        Обработчик нажатия кнопки выбора папки.
-
-        Открывает диалог выбора директории.
-
-        Args:
-            btn (Gtk.Button): Кнопка, вызвавшая событие.
-        """
+        """Открывает диалог выбора папки."""
         dialog = Gtk.FileDialog()
         dialog.select_folder(self, None, self.on_folder_selected)
 
     def on_folder_selected(self, dialog, result):
-        """
-        Обработчик результата выбора папки.
-
-        Устанавливает выбранный путь в поле ввода.
-
-        Args:
-            dialog (Gtk.FileDialog): Диалог выбора папки.
-            result (Gio.AsyncResult): Результат асинхронной операции.
-        """
+        """Обработчик выбора папки."""
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
@@ -217,14 +179,7 @@ class SettingsWindow(Gtk.Window):
         except Exception: pass
 
     def on_save_clicked(self, btn):
-        """
-        Обработчик нажатия кнопки "Сохранить".
-
-        Сохраняет настройки в файл и применяет их в главном окне.
-
-        Args:
-            btn (Gtk.Button): Кнопка, вызвавшая событие.
-        """
+        """Сохраняет настройки и обновляет главное окно."""
         new_app_settings = {
             'api_key': self.entry_api.get_text().strip(),
             'download_path': self.entry_path.get_text().strip(),
@@ -240,22 +195,10 @@ class SettingsWindow(Gtk.Window):
 
 # --- Приложение ---
 class WallpaperViewer(Gtk.Application):
-    """
-    Основное приложение для просмотра обоев с Wallhaven.
-
-    Наследуется от Gtk.Application и управляет жизненным циклом приложения.
-    """
-
     def __init__(self):
-        """Инициализирует приложение с уникальным идентификатором."""
         super().__init__(application_id="org.wallhaven.viewer")
 
     def do_activate(self):
-        """
-        Метод, вызываемый при активации приложения.
-
-        Загружает CSS-стили и отображает главное окно.
-        """
         provider = Gtk.CssProvider()
         css_path = resolve_path("style.css")
         try:
@@ -271,40 +214,9 @@ class WallpaperViewer(Gtk.Application):
 
 
 class MainWindow(Gtk.ApplicationWindow):
-    """
-    Главное окно приложения.
-
-    Отображает интерфейс поиска, фильтрации и просмотра обоев.
-    Поддерживает пагинацию, асинхронную загрузку превью и настройку параметров.
-
-    Attributes:
-        current_page (int): Текущая страница результатов поиска.
-        settings (dict): Настройки приложения.
-        current_query (str): Текущий поисковый запрос.
-        is_loading (bool): Флаг, указывающий на выполнение загрузки.
-        has_more_pages (bool): Флаг наличия следующих страниц.
-        builder (Gtk.Builder): Загрузчик UI из файла .ui.
-        entry (Gtk.Entry): Поле ввода поискового запроса.
-        btn_search (Gtk.Button): Кнопка поиска.
-        btn_settings (Gtk.Button): Кнопка открытия настроек.
-        btn_general, btn_anime, btn_people (Gtk.CheckButton): Категории обоев.
-        btn_sfw, btn_sketchy, btn_nsfw (Gtk.CheckButton): Уровни чистоты (purity).
-        res_dropdown, ratio_dropdown, sort_dropdown (Gtk.DropDown): Выбор разрешения, соотношения и сортировки.
-        infobar (Gtk.InfoBar): Панель уведомлений.
-        infobar_label (Gtk.Label): Метка для сообщений в infobar.
-        scrolled (Gtk.ScrolledWindow): Контейнер с прокруткой.
-        flowbox (Gtk.FlowBox): Контейнер для отображения превью обоев.
-        bottom_spinner (Gtk.Spinner): Спиннер загрузки следующей страницы.
-        v_adj (Gtk.Adjustment): Вертикальная прокрутка для отслеживания скролла.
-    """
+    """Главное окно приложения с сеткой обоев и фильтрами."""
     
     def __init__(self, app):
-        """
-        Инициализирует главное окно.
-
-        Args:
-            app (WallpaperViewer): Экземпляр приложения.
-        """
         super().__init__(application=app)
         self.set_title("Wallhaven Viewer")
         self.set_default_size(1200, 850)
@@ -324,11 +236,13 @@ class MainWindow(Gtk.ApplicationWindow):
         builder = Gtk.Builder.new_from_file(ui_path)
         xml_window = builder.get_object("main_window")
         
+        # Перенос HeaderBar
         header_bar = builder.get_object("header_bar")
         if header_bar:
             xml_window.set_titlebar(None)
             self.set_titlebar(header_bar)
 
+        # Перенос контента
         content = xml_window.get_child()
         if content:
             xml_window.set_child(None)
@@ -355,7 +269,7 @@ class MainWindow(Gtk.ApplicationWindow):
         
         self.flowbox.set_valign(Gtk.Align.START)
         
-        # Настройка виджетов
+        # Настройка виджетов из настроек
         self.entry.set_text(self.current_query) 
         self.btn_general.set_active(self.settings['cat_general'].lower() == 'true')
         self.btn_anime.set_active(self.settings['cat_anime'].lower() == 'true')
@@ -402,10 +316,10 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def get_thumbnail_size(self):
         """
-        Вычисляет размеры превью на основе текущей ширины окна и количества колонок.
-
+        Рассчитывает размер миниатюры для текущего размера окна.
+        
         Returns:
-            tuple[int, int]: Ширина и высота одной миниатюры (ширина, высота).
+            tuple: (width, height) в пикселях.
         """
         cols = int(self.settings.get('columns', 4))
         win_width = self.get_width()
@@ -417,25 +331,11 @@ class MainWindow(Gtk.ApplicationWindow):
         return target_width, target_height
 
     def on_infobar_close_clicked(self, button):
-        """
-        Обработчик закрытия информационной панели.
-
-        Args:
-            button (Gtk.Button): Кнопка закрытия.
-
-        Returns:
-            bool: Всегда False.
-        """
         self.infobar.set_visible(False)
         return False
         
     def get_cache_dir(self):
-        """
-        Получает путь к директории кэша приложения и создаёт её при необходимости.
-
-        Returns:
-            str or None: Путь к кэшу или None при ошибке.
-        """
+        """Возвращает путь к папке кэша."""
         cache_dir = os.path.join(GLib.get_user_cache_dir(), "wallhaven_viewer_cache")
         if not os.path.exists(cache_dir):
             try:
@@ -446,27 +346,14 @@ class MainWindow(Gtk.ApplicationWindow):
         return cache_dir
 
     def show_infobar(self, message):
-        """
-        Отображает сообщение в информационной панели на 5 секунд.
-
-        Args:
-            message (str): Текст сообщения.
-
-        Returns:
-            bool: Всегда False.
-        """
+        """Отображает сообщение об ошибке пользователю."""
         self.infobar_label.set_text(message)
         self.infobar.set_visible(True) 
         GLib.timeout_add_seconds(5, lambda: self.infobar.set_visible(False))
         return False
     
     def get_current_search_state(self):
-        """
-        Собирает текущие параметры поиска и фильтрации из интерфейса.
-
-        Returns:
-            dict: Словарь с состоянием фильтров и других параметров.
-        """
+        """Возвращает текущее состояние фильтров."""
         return {
             'last_query': self.entry.get_text().strip(),
             'cat_general': str(self.btn_general.get_active()).lower(),
@@ -481,15 +368,7 @@ class MainWindow(Gtk.ApplicationWindow):
         }
 
     def on_filter_changed(self, widget, *args):
-        """
-        Обработчик изменения любого фильтра.
-
-        Сохраняет настройки и запускает новый поиск.
-
-        Args:
-            widget (Gtk.Widget): Виджет, вызвавший событие.
-            *args: Дополнительные аргументы.
-        """
+        """Обработчик изменения фильтров."""
         search_state = self.get_current_search_state()
         final_settings = {**self.settings, **search_state}
         save_settings(final_settings)
@@ -497,14 +376,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.start_new_search(self.entry.get_text().strip())
 
     def apply_settings(self, new_settings):
-        """
-        Применяет новые настройки к интерфейсу.
-
-        Обновляет количество колонок и значения в выпадающих меню.
-
-        Args:
-            new_settings (dict): Новые настройки.
-        """
+        """Применяет новые настройки."""
         old_cols = int(self.settings.get('columns', 4))
         old_key = self.settings.get('api_key', '')
         self.settings = new_settings
@@ -521,23 +393,9 @@ class MainWindow(Gtk.ApplicationWindow):
             self.start_new_search(self.current_query)
 
     def open_settings(self, widget):
-        """
-        Открывает окно настроек.
-
-        Args:
-            widget (Gtk.Widget): Виджет, вызвавший событие.
-        """
         SettingsWindow(self).present()
         
     def check_api_key_on_purity_change(self, toggle_button):
-        """
-        Проверяет наличие API-ключа при включении NSFW/Sketchy.
-
-        Если ключ не задан, открывает окно настроек и отключает переключатель.
-
-        Args:
-            toggle_button (Gtk.CheckButton): Переключатель purity (NSFW/Sketchy).
-        """
         api_key = self.settings.get('api_key', '')
         if toggle_button.get_active() and not api_key:
             self.open_settings(None)
@@ -545,14 +403,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.on_filter_changed(toggle_button)
         
     def on_scroll_changed(self, adj):
-        """
-        Обработчик прокрутки.
-
-        Автоматически загружает следующую страницу при приближении к концу.
-
-        Args:
-            adj (Gtk.Adjustment): Объект вертикальной прокрутки.
-        """
         if self.is_loading or not self.has_more_pages:
             return
         current_pos = adj.get_value() + adj.get_page_size()
@@ -561,21 +411,11 @@ class MainWindow(Gtk.ApplicationWindow):
             self.load_next_page()
 
     def load_next_page(self):
-        """Загружает следующую страницу результатов поиска."""
         self.current_page += 1
         self.load_wallpapers(self.current_query, self.current_page)
         
     def get_api_params(self, query, page):
-        """
-        Формирует параметры запроса к API Wallhaven на основе текущих фильтров.
-
-        Args:
-            query (str): Поисковый запрос.
-            page (int): Номер страницы.
-
-        Returns:
-            dict: Параметры GET-запроса.
-        """
+        """Формирует параметры для API-запроса."""
         c_gen = "1" if self.btn_general.get_active() else "0"
         c_ani = "1" if self.btn_anime.get_active() else "0"
         c_peo = "1" if self.btn_people.get_active() else "0"
@@ -611,15 +451,6 @@ class MainWindow(Gtk.ApplicationWindow):
 
     @staticmethod
     def load_pixbuf_from_bytes(img_bytes):
-        """
-        Создаёт объект GdkPixbuf.Pixbuf из байтов изображения.
-
-        Args:
-            img_bytes (bytes): Данные изображения.
-
-        Returns:
-            GdkPixbuf.Pixbuf or None: Объект Pixbuf или None при ошибке.
-        """
         try:
             loader = GdkPixbuf.PixbufLoader()
             loader.write(img_bytes)
@@ -629,16 +460,10 @@ class MainWindow(Gtk.ApplicationWindow):
             print(f"Ошибка создания Pixbuf: {e}")
             return None
     
+    # === АСИНХРОННАЯ ЗАГРУЗКА ДЛЯ УМНОЙ ЗАГЛУШКИ ===
     def load_thumbnail_async(self, placeholder_btn, thumb_url):
         """
-        Асинхронно загружает превью изображения.
-
-        Сначала проверяет кэш, затем при необходимости — сеть.
-        Обновляет переданную кнопку-заглушку.
-
-        Args:
-            placeholder_btn (Gtk.Button): Кнопка-заглушка для обновления.
-            thumb_url (str): URL превью для загрузки.
+        Загружает миниатюру в фоне и обновляет переданную кнопку-заглушку.
         """
         cache_dir = self.get_cache_dir()
         if not cache_dir:
@@ -668,6 +493,7 @@ class MainWindow(Gtk.ApplicationWindow):
                         except Exception: pass
                 except Exception as e:
                     print(f"Ошибка загрузки {thumb_url}: {e}")
+                    # Удаляем заглушку при ошибке
                     GLib.idle_add(lambda: self.flowbox.remove(placeholder_btn))
                     return 
 
@@ -682,51 +508,37 @@ class MainWindow(Gtk.ApplicationWindow):
 
         threading.Thread(target=worker, daemon=True).start()
     
+    # === ОБНОВЛЕНИЕ ЗАГЛУШКИ ===
     def update_thumbnail_ui(self, btn, pixbuf):
-        """
-        Обновляет интерфейс кнопки с загруженным превью.
-
-        Заменяет спиннер на изображение.
-
-        Args:
-            btn (Gtk.Button): Кнопка для обновления.
-            pixbuf (GdkPixbuf.Pixbuf): Изображение для отображения.
-        """
+        """Заменяет содержимое заглушки на загруженное изображение."""
         try:
+            # Очистка
             btn.set_child(None)
             btn.remove_css_class("skeleton")
             
-            width, height = self.get_thumbnail_size()
+            # Адаптивный размер (hexpand делает магию)
+            # Мы не задаем жесткий размер, а позволяем FlowBox управлять им
+            btn.set_hexpand(True) 
+            btn.set_vexpand(False) # Высота зависит от ширины (см. ниже)
+            
+            # Получаем примерную ширину для ratio (не обязательно, но полезно)
+            target_width, target_height = self.get_thumbnail_size()
             
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
             picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.COVER)
-            picture.set_size_request(width, height)
+            # Минимальный размер, чтобы картинка не схлопнулась
+            picture.set_size_request(-1, target_height) 
             
             btn.set_child(picture)
         except Exception as e:
             print(f"Ошибка обновления UI: {e}")
 
     def open_full_image(self, widget, url):
-        """
-        Открывает окно полноразмерного изображения.
-
-        Args:
-            widget (Gtk.Widget): Виджет, вызвавший событие.
-            url (str): URL полного изображения.
-        """
         win = FullImageWindow(self, url, self.settings.get('download_path', ''))
         win.present()
 
     def on_search_clicked(self, widget):
-        """
-        Обработчик нажатия кнопки поиска.
-
-        Сохраняет настройки и запускает новый поиск.
-
-        Args:
-            widget (Gtk.Button): Кнопка поиска.
-        """
         query = self.entry.get_text().strip()
         search_state = self.get_current_search_state()
         final_settings = {**self.settings, **search_state}
@@ -735,21 +547,14 @@ class MainWindow(Gtk.ApplicationWindow):
         self.start_new_search(query)
         
     def create_placeholder_btn(self, full_url):
-        """
-        Создаёт кнопку-заглушку для превью.
-
-        Содержит спиннер и стилизацию под "скелет".
-
-        Args:
-            full_url (str): URL полного изображения (для открытия по клику).
-
-        Returns:
-            Gtk.Button: Новая кнопка-заглушка.
-        """
+        """Создает кнопку-заглушку (скелет)."""
         width, height = self.get_thumbnail_size()
         
         btn = Gtk.Button()
-        btn.set_size_request(width, height)
+        # Начальный размер
+        btn.set_size_request(-1, height)
+        btn.set_hexpand(True) # Растягиваем по ширине
+        
         btn.set_margin_start(5)
         btn.set_margin_end(5)
         btn.set_margin_top(5)
@@ -764,22 +569,18 @@ class MainWindow(Gtk.ApplicationWindow):
         s.set_valign(Gtk.Align.CENTER)
         btn.set_child(s)
         
+        # Подключаем клик сразу
         btn.connect("clicked", self.open_full_image, full_url)
         
         return btn
 
     def start_new_search(self, query):
-        """
-        Запускает новый поиск с обнуления страницы и очистки результата.
-
-        Args:
-            query (str): Поисковый запрос.
-        """
         self.current_page = 1
         self.current_query = query
         self.has_more_pages = True
         self.infobar.set_visible(False) 
         
+        # Полная очистка
         while True:
             child = self.flowbox.get_first_child()
             if child is None: break
@@ -788,13 +589,6 @@ class MainWindow(Gtk.ApplicationWindow):
         self.load_wallpapers(query, 1)
 
     def load_wallpapers(self, query, page):
-        """
-        Асинхронно загружает страницу результатов поиска.
-
-        Args:
-            query (str): Поисковый запрос.
-            page (int): Номер страницы.
-        """
         self.is_loading = True
         if page > 1:
             self.bottom_spinner.set_visible(True)
@@ -811,6 +605,7 @@ class MainWindow(Gtk.ApplicationWindow):
                 if not data and page == 1:
                      GLib.idle_add(self.show_infobar, "Ничего не найдено")
 
+                # Подготовка данных для UI
                 items_to_add = []
                 for w in data:
                     thumbs = w.get("thumbs", {})
@@ -819,6 +614,7 @@ class MainWindow(Gtk.ApplicationWindow):
                     if thumb and full:
                         items_to_add.append((thumb, full))
                 
+                # Создаем заглушки
                 GLib.idle_add(self.create_placeholders_and_load, items_to_add)
 
                 last_page = meta.get("last_page", 1)
@@ -832,26 +628,13 @@ class MainWindow(Gtk.ApplicationWindow):
         threading.Thread(target=worker, daemon=True).start()
     
     def create_placeholders_and_load(self, items):
-        """
-        Создаёт заглушки для списка изображений и запускает их загрузку.
-
-        Args:
-            items (list[tuple[str, str]]): Список пар (URL превью, URL полного).
-        """
+        """Создает заглушки и запускает загрузку."""
         for thumb_url, full_url in items:
             btn = self.create_placeholder_btn(full_url)
             self.flowbox.append(btn)
             self.load_thumbnail_async(btn, thumb_url)
 
     def finish_loading_page(self, has_more):
-        """
-        Завершает процесс загрузки страницы.
-
-        Останавливает спиннер и обновляет состояние.
-
-        Args:
-            has_more (bool): Есть ли ещё страницы.
-        """
         self.is_loading = False
         self.has_more_pages = has_more
         self.bottom_spinner.stop()
@@ -860,32 +643,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
 # --- FullImageWindow ---
 class FullImageWindow(Gtk.Window):
-    """
-    Окно просмотра полноразмерного изображения.
-
-    Позволяет просматривать и сохранять изображение.
-
-    Attributes:
-        parent (MainWindow): Родительское окно.
-        image_url (str): URL полного изображения.
-        download_path (str): Путь сохранения по умолчанию.
-        image_data (bytes): Данные изображения после загрузки.
-        wallpaper_id (str): Идентификатор обоев.
-        picture (Gtk.Picture): Виджет для отображения изображения.
-        spinner (Gtk.Spinner): Спиннер загрузки.
-        save_btn (Gtk.Button): Кнопка сохранения.
-        progress_bar (Gtk.ProgressBar): Прогресс-бар загрузки.
-    """
+    """Окно просмотра полноразмерного изображения."""
     
     def __init__(self, parent, image_url, download_path):
-        """
-        Инициализирует окно полного изображения.
-
-        Args:
-            parent (MainWindow): Родительское окно.
-            image_url (str): URL изображения.
-            download_path (str): Путь для сохранения.
-        """
         super().__init__(transient_for=parent)
         self.image_url = image_url
         self.download_path = download_path
@@ -920,13 +680,6 @@ class FullImageWindow(Gtk.Window):
         threading.Thread(target=self.load_image_and_info, daemon=True).start()
 
     def update_progress(self, current_bytes, total_bytes):
-        """
-        Обновляет прогресс-бар загрузки изображения.
-
-        Args:
-            current_bytes (int): Текущее количество загруженных байт.
-            total_bytes (int): Общее количество байт.
-        """
         if total_bytes > 0:
             fraction = current_bytes / total_bytes
             percent = int(fraction * 100)
@@ -937,7 +690,6 @@ class FullImageWindow(Gtk.Window):
             self.spinner.set_visible(False)
 
     def load_image_and_info(self):
-        """Асинхронно загружает изображение и информацию о нём (разрешение)."""
         resolution = "" 
         try:
             info_url = f"https://wallhaven.cc/api/v1/w/{self.wallpaper_id}"

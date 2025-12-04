@@ -34,7 +34,7 @@ RESOLUTION_OPTIONS = [
     ("Любое", ""),
     ("1024x768 (XGA)", "1024x768"),
     ("1280x720 (HD)", "1280x720"),
-    ("1920x1080 (FHD)", "1920x1080"),
+    ("1920x1080 (FHD)", "1999x1080"), # Wallhaven использует "at least" для 1920x1080
     ("2560x1440 (QHD)", "2560x1440"),
     ("3840x2160 (4K)", "3840x2160"),
     ("5120x2880 (5K)", "5120x2880"),
@@ -511,7 +511,7 @@ class MainWindow(Gtk.ApplicationWindow):
                         except Exception: pass
                 except Exception as e:
                     print(f"Ошибка загрузки {thumb_url}: {e}")
-                    # !!! ИСПРАВЛЕНИЕ: Показываем заглушку при ошибке
+                    # Показываем заглушку при ошибке
                     GLib.idle_add(self.show_error_indicator, placeholder_btn, wallpaper_id)
                     return 
 
@@ -542,7 +542,10 @@ class MainWindow(Gtk.ApplicationWindow):
             
             overlay = Gtk.Overlay()
 
+            # --- ВОЗВРАТ К РАБОЧЕМУ МЕТОДУ (Gdk.Texture.new_for_pixbuf) ---
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+            # -------------------------------------------------------------------
+            
             picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.COVER)
             picture.set_size_request(-1, target_height) 
@@ -563,10 +566,9 @@ class MainWindow(Gtk.ApplicationWindow):
         except Exception as e:
             print(f"Ошибка обновления UI: {e}")
 
-    # !!! НОВЫЙ МЕТОД ДЛЯ ОТОБРАЖЕНИЯ ОШИБКИ
     def show_error_indicator(self, btn, wallpaper_id):
         """
-        Показывает заглушку, если миниатюра недоступна, но обои скачаны.
+        Показывает заглушку (дискету), если миниатюра недоступна, но обои скачаны.
         """
         try:
             btn.set_child(None)
@@ -599,6 +601,7 @@ class MainWindow(Gtk.ApplicationWindow):
             btn.set_child(error_box)
         except Exception as e:
              print(f"Критическая ошибка при создании индикатора ошибки: {e}")
+
 
     def open_full_image(self, widget, url):
         wallpaper_id = url.split('/')[-1].split('.')[0]
@@ -676,7 +679,9 @@ class MainWindow(Gtk.ApplicationWindow):
             
             for w_id in self.downloaded_ids:
                 # Генерируем URL для миниатюры (может не существовать!)
+                # URL для полноразмерного изображения (Wallhaven convention)
                 full_url = f"https://w.wallhaven.cc/full/{w_id[0:2]}/wallhaven-{w_id}.jpg"
+                # URL для миниатюры
                 thumb_url = f"https://th.wallhaven.cc/lg/th/{w_id[0:2]}/{w_id}.jpg" 
                 items_to_add.append((thumb_url, full_url, w_id))
 
@@ -862,7 +867,10 @@ class FullImageWindow(Gtk.Window):
         self.set_title(f"Wallhaven - ID: {self.wallpaper_id}{res_str}")
 
     def update_image(self, pixbuf):
+        # --- ВОЗВРАТ К РАБОЧЕМУ МЕТОДУ (Gdk.Texture.new_for_pixbuf) ---
         texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+        # -------------------------------------------------------------------
+        
         self.picture.set_paintable(texture)
         self.spinner.stop()
         self.spinner.set_visible(False)
@@ -875,7 +883,19 @@ class FullImageWindow(Gtk.Window):
     def on_save_clicked(self, btn):
         if not self.image_data: return
         
-        content_type = GdkPixbuf.PixbufFormat.identify(self.image_data).get_name()
+        # --- ИСПРАВЛЕНИЕ: Используем PixbufLoader для определения формата (замена identify) ---
+        content_type = ""
+        try:
+            loader = GdkPixbuf.PixbufLoader()
+            loader.write(self.image_data)
+            # Пытаемся получить имя формата через loader
+            content_type = loader.get_format().get_name()
+            loader.close()
+        except Exception:
+            # Если не смогли определить формат (или данные неполные), предполагаем JPEG
+            content_type = "jpeg" 
+        # ------------------------------------------------------------------------------------
+
         ext = '.jpg' if 'jpeg' in content_type else '.png'
         name = self.wallpaper_id + ext
 

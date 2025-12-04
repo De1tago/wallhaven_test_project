@@ -44,7 +44,8 @@
     <child type="titlebar">
       <object class="GtkHeaderBar" id="header_bar">
         <child type="start">
-          <object class="GtkBox" orientation="horizontal">
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
             <child>
               <object class="GtkButton" id="set_wp_btn">
                 <property name="label">Установить обои</property>

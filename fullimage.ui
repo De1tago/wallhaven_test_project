@@ -49,8 +49,8 @@
             <child>
               <object class="GtkButton" id="set_wp_btn">
                 <property name="label">Установить обои</property>
-                <property name="icon-name">view-list-details-symbolic</property>
-                <property name="sensitive">false</property>
+                <property name="icon_name">preferences-desktop-wallpaper-symbolic</property>
+                <property name="tooltip_text" translatable="yes">Установить как обои</property>
                 <style>
                   <class name="suggested-action"/>
                 </style>

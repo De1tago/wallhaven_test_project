@@ -1114,16 +1114,16 @@ class FullImageWindow(Gtk.Window):
     def on_set_wallpaper_clicked(self, btn):
         """
         Устанавливает изображение в качестве обоев рабочего стола.
-        Работает только с локально сохраненным файлом.
+        Меняет иконку на "выбрано" на 1.5 секунды.
         """
         if self.local_path:
             try:
                 threading.Thread(target=self._set_wallpaper_worker, args=(self.local_path,), daemon=True).start()
-                btn.set_icon_name("object-select-symbolic")
-                GLib.timeout_add(1500, lambda: btn.set_icon_name("view-list-details-symbolic"))
-                
+                btn.set_icon_name("object-select-symbolic")  # Кратковременная обратная связь
+                GLib.timeout_add(1500, lambda: btn.set_icon_name("preferences-desktop-wallpaper-symbolic"))
             except Exception as e:
-                print(f"Ошибка установки обоев: {e}")
+                print(f"Ошибка инициализации установки обоев: {e}")
+
 
     def _set_wallpaper_worker(self, path):
         """

@@ -570,7 +570,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         sort_idx = self.sort_dropdown.get_selected()
         sort_modes = ["relevance", "random", "date_added", "views", "favorites", "toplist", "hot"]
-        sorting = sort_modes[sort_idx] if sort_idx < len(sort_modes) else "relevance"
+        sorting = sort_modes[sort_idx] if sort_idx < len(sort_modes) else "vievs"
         
         res_idx = self.res_dropdown.get_selected()
         ratio_idx = self.ratio_dropdown.get_selected()

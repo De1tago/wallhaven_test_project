@@ -311,6 +311,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.infobar = builder.get_object("infobar")
         self.infobar_label = builder.get_object("infobar_label")
         self.scrolled = builder.get_object("scrolled")
+        self.connect("notify::default-width", lambda *args: GLib.idle_add(self.check_if_can_load_next_page))
         self.flowbox = builder.get_object("flowbox")
         self.bottom_spinner = builder.get_object("bottom_spinner")
         
@@ -539,15 +540,50 @@ class MainWindow(Gtk.ApplicationWindow):
         
     def on_scroll_changed(self, adj):
         """
-        Обработчик изменения положения скролла. 
-        Запускает загрузку следующей страницы, если достигнут низ.
+        Обработчик прокрутки. Подгружает следующую страницу, когда пользователь
+        приближается к концу списка (на расстоянии одной строки).
         """
-        if self.is_loading or not self.has_more_pages or self.is_downloaded_mode: 
+        GLib.idle_add(self.check_if_can_load_next_page)
+        if self.is_loading or not self.has_more_pages or self.is_downloaded_mode:
             return
+
+        # Оцениваем высоту строки на основе размера миниатюры
+        _, thumbnail_height = self.get_thumbnail_size()
+        row_height = thumbnail_height + 10  # +10 отступы (5 сверху + 5 снизу)
+
         current_pos = adj.get_value() + adj.get_page_size()
         max_height = adj.get_upper()
-        if max_height - current_pos < 300:
+
+        if max_height - current_pos < row_height *1.5:
             self.load_next_page()
+    def check_if_can_load_next_page(self):
+        """
+        Проверяет, нужно ли подгрузить следующую страницу.
+        Работает как при активной прокрутке, так и при её отсутствии.
+        """
+        if self.is_loading or not self.has_more_pages or self.is_downloaded_mode:
+            return False
+
+        adj = self.v_adj
+        current_pos = adj.get_value() + adj.get_page_size()
+        max_height = adj.get_upper()
+
+        # Если скролл активен — используем обычную логику
+        if max_height > adj.get_page_size():
+            row_height = self.get_thumbnail_size()[1] + 10
+            if max_height - current_pos < row_height:
+                self.load_next_page()
+                return True
+        else:
+            # Скролла нет (весь контент виден), но может быть больше страниц
+            # → Попробуем подгрузить, если пользователь "внизу"
+            child = self.flowbox.get_first_child()
+            if child is not None:
+                self.load_next_page()
+                return True
+
+        return False
+
 
     def load_next_page(self):
         """Увеличивает номер страницы и запускает загрузку следующего блока обоев."""
@@ -922,13 +958,16 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def finish_loading_page(self, has_more):
         """
-        Завершает процесс загрузки страницы, обновляет статус и скрывает спиннер.
+        Завершает процесс загрузки страницы, обновляет статус и скрользер.
         """
         self.is_loading = False
         self.has_more_pages = has_more
         self.bottom_spinner.stop()
         self.bottom_spinner.set_visible(False)
 
+        # Попробуем подгрузить следующую страницу сразу,
+        # если контент не прокручивается
+        GLib.idle_add(self.check_if_can_load_next_page)
 
 # --- FullImageWindow ---
 class FullImageWindow(Gtk.Window):

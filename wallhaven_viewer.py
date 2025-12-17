@@ -368,26 +368,39 @@ class MainWindow(Gtk.ApplicationWindow):
         
     def scan_downloaded_wallpapers(self):
         """
-        Сканирует настроенную папку для загрузок.
-
-        Обновляет словарь self.downloaded_files (ID: путь) и множество self.downloaded_ids (только ID).
+        Сканирует папку загрузок и индексирует все изображения по ID.
+        Поддерживает: wallhaven-<id>.jpg, <id>.jpg, full-<id>.png и т.д.
         """
-        self.downloaded_files = {} 
+        self.downloaded_files = {}
         self.downloaded_ids.clear()
+
         download_path = self.settings.get('download_path', '')
-        
         if not download_path or not os.path.isdir(download_path):
+            print(f"❌ Папка для загрузок не задана или не существует: {download_path}")
             return
 
-        for ext in ['*.jpg', '*.png', '*.jpeg']:
-            for file_path in glob.glob(os.path.join(download_path, ext)):
+        print(f"🔍 Сканируем папку: {download_path}")
+
+        # Поддержка разных расширений
+        for ext in ['*.jpg', '*.jpeg', '*.png']:
+            pattern = os.path.join(download_path, ext)
+            for file_path in glob.glob(pattern):
                 filename = os.path.basename(file_path)
-                wallpaper_id = filename.split('.')[0] 
+                # Извлекаем ID: yqqxq7.jpg → yqqxq7
+                # wallhaven-yqqxq7.jpg → yqqxq7
+                # full-yqqxq7.png → yqqxq7
+                name = filename.split('.')[0]
+                # Удаляем возможные префиксы
+                for prefix in ['wallhaven-', 'full-', 'w-', 'wh-']:
+                    if name.startswith(prefix):
+                        name = name[len(prefix):]
+                wallpaper_id = name
                 if wallpaper_id:
                     self.downloaded_files[wallpaper_id] = file_path
-        
-        self.downloaded_ids = set(self.downloaded_files.keys()) 
-        print(f"Найдено скачанных обоев: {len(self.downloaded_ids)}")
+                    print(f"✅ Найдено: ID={wallpaper_id} → {file_path}")
+
+        self.downloaded_ids = set(self.downloaded_files.keys())
+        print(f"✅ Найдено скачанных обоев: {len(self.downloaded_ids)}")
         
     def on_downloaded_toggle(self, btn):
         """
@@ -609,77 +622,111 @@ class MainWindow(Gtk.ApplicationWindow):
             return None
     
     def load_thumbnail_async(self, placeholder_btn, thumb_url, full_url, wallpaper_id, local_path=None): 
-        """
-        Загружает миниатюру в фоне, используя многопоточность.
-
-        Приоритет загрузки: локальный файл -> кэш -> сеть.
-        Обновляет UI после завершения загрузки или при возникновении ошибки.
-
-        Args:
-            placeholder_btn (Gtk.Button): Кнопка-заглушка, которую нужно обновить.
-            thumb_url (str or None): URL миниатюры для загрузки из сети/кэша.
-            full_url (str): URL полноразмерного изображения (для передачи в FullImageWindow).
-            wallpaper_id (str): Уникальный ID обоев.
-            local_path (str, optional): Полный локальный путь к файлу, если он скачан.
-        """
         cache_dir = self.get_cache_dir()
-        
-        def worker():
-            img_data = None
-            cache_path = None
+        cache_path = None
+        if cache_dir and thumb_url:
+            filename = thumb_url.split('/')[-1]
+            cache_path = os.path.join(cache_dir, filename)
 
-            # 1. ЛОКАЛЬНАЯ ЗАГРУЗКА (ЕСЛИ ФАЙЛ СКАЧАН)
+        def worker():
+            pixbuf = None
+            target_width, target_height = self.get_thumbnail_size()
+
+            # 1. ЛОКАЛЬНЫЙ ФАЙЛ — с защитой от больших/битых изображений
             if local_path and os.path.exists(local_path):
                 try:
-                    with open(local_path, "rb") as f: 
-                        img_data = f.read()
-                    print(f"Миниатюра загружена локально для ID: {wallpaper_id}")
-                    
-                except Exception as e:
-                    print(f"Ошибка чтения локального файла {local_path}: {e}")
-                    img_data = None
-            
-            # 2. Кэш (только если нет локального пути, но есть URL миниатюры)
-            elif thumb_url and cache_dir:
-                filename = thumb_url.split('/')[-1]
-                cache_path = os.path.join(cache_dir, filename)
-                if os.path.exists(cache_path):
-                    try:
-                        with open(cache_path, "rb") as f: img_data = f.read()
-                    except Exception: img_data = None 
+                    file_size = os.path.getsize(local_path)
+                    if file_size < 100:
+                        raise ValueError("Файл слишком мал")
 
-            # 3. Сеть (только если нет локального пути и кэша, но есть URL)
-            if img_data is None and thumb_url:
+                    print(f"🔍 Попытка загрузки локальной миниатюры: {local_path} ({file_size} байт)")
+
+                    # Попробуем создать Pixbuf с обработкой ошибок
+                    loader = GdkPixbuf.PixbufLoader()
+
+                    with open(local_path, "rb") as f:
+                        chunk = f.read(1024)
+                        while chunk:
+                            loader.write(chunk)
+                            chunk = f.read(1024)
+                    loader.close()
+
+                    original_pixbuf = loader.get_pixbuf()
+                    if not original_pixbuf:
+                        raise Exception("Pixbuf не создан (loader.get_pixbuf() вернул None)")
+
+                    width = original_pixbuf.get_width()
+                    height = original_pixbuf.get_height()
+                    print(f"✅ Загружено: {width}x{height}")
+
+                    # Масштабируем
+                    scale_factor = min(target_width / width, target_height / height)
+                    new_width = int(width * scale_factor)
+                    new_height = int(height * scale_factor)
+
+                    new_width = max(1, new_width)
+                    new_height = max(1, new_height)
+
+                    pixbuf = original_pixbuf.scale_simple(
+                        new_width,
+                        new_height,
+                        GdkPixbuf.InterpType.BILINEAR
+                    )
+                    if pixbuf:
+                        print(f"✅ Масштабировано: {new_width}x{new_height}")
+                        GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf, wallpaper_id)
+                        return
+
+                except Exception as e:
+                    print(f"❌ Ошибка локальной загрузки {local_path}: {type(e).__name__}: {e}")
+
+            # 2. КЭШ
+            if cache_path and os.path.exists(cache_path):
                 try:
+                    print(f"🔍 Попытка загрузки из кэша: {cache_path}")
+                    img_data = open(cache_path, "rb").read()
+                    if len(img_data) < 100:
+                        raise ValueError("Кэш слишком мал")
+
+                    p = self.load_pixbuf_from_bytes(img_data)
+                    if p:
+                        pixbuf = p.scale_simple(target_width, target_height, GdkPixbuf.InterpType.BILINEAR)
+                except Exception as e:
+                    print(f"❌ Ошибка кэша {cache_path}: {e}")
+
+            # 3. СЕТЬ
+            if pixbuf is None and thumb_url:
+                try:
+                    print(f"🔍 Попытка загрузки из сети: {thumb_url}")
                     resp = requests.get(thumb_url, timeout=15)
                     resp.raise_for_status()
                     img_data = resp.content
-                    if cache_path: 
-                        try:
-                            with open(cache_path, "wb") as f: f.write(img_data)
-                        except Exception: pass
-                except Exception as e:
-                    print(f"Ошибка загрузки {thumb_url}: {e}")
-                    GLib.idle_add(self.show_error_indicator, placeholder_btn, wallpaper_id)
-                    return 
+                    if len(img_data) < 100:
+                        raise ValueError("Пустой ответ")
 
-            # 4. Обновление UI
-            if img_data:
-                try:
-                    pixbuf = MainWindow.load_pixbuf_from_bytes(img_data)
-                    if pixbuf:
-                        target_width, target_height = self.get_thumbnail_size()
-                        pixbuf = pixbuf.scale_simple(
-                            target_width, 
-                            target_height, 
-                            GdkPixbuf.InterpType.BILINEAR
-                        )
-                        GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf, wallpaper_id)
+                    p = self.load_pixbuf_from_bytes(img_data)
+                    if p:
+                        pixbuf = p.scale_simple(target_width, target_height, GdkPixbuf.InterpType.BILINEAR)
+
+                    if cache_path:
+                        try:
+                            with open(cache_path, "wb") as f:
+                                f.write(img_data)
+                            print(f"✅ Сохранено в кэш: {cache_path}")
+                        except Exception as e:
+                            print(f"⚠️ Не удалось сохранить кэш: {e}")
                 except Exception as e:
-                    print(f"Ошибка создания Pixbuf из данных: {e}")
-                    GLib.idle_add(self.show_error_indicator, placeholder_btn, wallpaper_id)
+                    print(f"❌ Ошибка сети {thumb_url}: {e}")
+
+            # 4. ФИНАЛ
+            if pixbuf:
+                GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf, wallpaper_id)
+            else:
+                print(f"💀 Все попытки загрузки миниатюры для {wallpaper_id} провалились")
+                GLib.idle_add(self.show_error_indicator, placeholder_btn, wallpaper_id)
 
         threading.Thread(target=worker, daemon=True).start()
+
     
     def update_thumbnail_ui(self, btn, pixbuf, wallpaper_id): 
         """
@@ -755,14 +802,14 @@ class MainWindow(Gtk.ApplicationWindow):
         except Exception as e:
              print(f"Критическая ошибка при создании индикатора ошибки: {e}")
 
-    def open_full_image(self, widget, url):
+    def open_full_image(self, widget, url, local_path=None):
         """
         Открывает окно полноразмерного просмотра для выбранных обоев.
         """
         wallpaper_id = url.split('/')[-1].split('.')[0]
-        local_path = self.downloaded_files.get(wallpaper_id)
         win = FullImageWindow(self, url, self.settings.get('download_path', ''), local_path) 
         win.present()
+
 
     def on_search_clicked(self, widget):
         """Обработчик нажатия кнопки поиска или Enter в поле ввода."""
@@ -773,7 +820,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.settings = final_settings
         self.start_new_search(query)
         
-    def create_placeholder_btn(self, full_url, wallpaper_id): 
+    def create_placeholder_btn(self, full_url, wallpaper_id, local_path=None): 
         """
         Создает кнопку-заглушку ('скелет') с анимацией загрузки.
         """
@@ -785,8 +832,8 @@ class MainWindow(Gtk.ApplicationWindow):
         btn.set_margin_end(5)
         btn.set_margin_top(5)
         btn.set_margin_bottom(5)
-        if wallpaper_id in self.downloaded_ids:
-             btn.add_css_class("downloaded") 
+        if local_path and os.path.exists(local_path):
+            btn.add_css_class("downloaded") 
         btn.add_css_class("skeleton")
         btn.add_css_class("thumbnail")
         s = Gtk.Spinner()
@@ -794,8 +841,9 @@ class MainWindow(Gtk.ApplicationWindow):
         s.set_halign(Gtk.Align.CENTER)
         s.set_valign(Gtk.Align.CENTER)
         btn.set_child(s)
-        btn.connect("clicked", self.open_full_image, full_url)
+        btn.connect("clicked", self.open_full_image, full_url, local_path)
         return btn
+
 
     def start_new_search(self, query):
         """
@@ -868,7 +916,7 @@ class MainWindow(Gtk.ApplicationWindow):
         Создает заглушки в UI и запускает асинхронную загрузку миниатюр.
         """
         for thumb_url, full_url, wallpaper_id, local_path in items: 
-            btn = self.create_placeholder_btn(full_url, wallpaper_id) 
+            btn = self.create_placeholder_btn(full_url, wallpaper_id, local_path) 
             self.flowbox.append(btn)
             self.load_thumbnail_async(btn, thumb_url, full_url, wallpaper_id, local_path) 
 
@@ -1113,44 +1161,55 @@ class FullImageWindow(Gtk.Window):
         
     def on_set_wallpaper_clicked(self, btn):
         """
-        Устанавливает изображение в качестве обоев рабочего стола.
-        Меняет иконку на "выбрано" на 1.5 секунды.
+        Устанавливает локальное изображение как обои.
         """
-        if self.local_path:
-            try:
-                threading.Thread(target=self._set_wallpaper_worker, args=(self.local_path,), daemon=True).start()
-                btn.set_icon_name("object-select-symbolic")  # Кратковременная обратная связь
-                GLib.timeout_add(1500, lambda: btn.set_icon_name("preferences-desktop-wallpaper-symbolic"))
-            except Exception as e:
-                print(f"Ошибка инициализации установки обоев: {e}")
+        if not self.local_path:
+            print("❌ Нет локального пути — нельзя установить как обои")
+            return
 
+        if not os.path.exists(self.local_path):
+            print(f"❌ Файл не найден: {self.local_path}")
+            self.show_error_dialog("Файл не найден", "Изображение было перемещено или удалено.")
+            return
+
+        # Показываем обратную связь
+        btn.set_icon_name("object-select-symbolic")
+        GLib.timeout_add(1500, lambda: btn.set_icon_name("preferences-desktop-wallpaper-symbolic"))
+
+        # Запускаем в потоке
+        threading.Thread(target=self._set_wallpaper_worker, args=(self.local_path,), daemon=True).start()
 
     def _set_wallpaper_worker(self, path):
         """
-        Рабочий поток для безопасной установки обоев.
-        Проверяет наличие ключа 'picture-uri-dark' перед использованием.
+        Устанавливает обои через GSettings.
+        Безопасно проверяет доступность ключей.
         """
         try:
-            uri = Gio.File.new_for_path(path).get_uri()
+            # Преобразуем путь в file:// URI (экранируем пробелы и спецсимволы)
+            file_uri = Gio.File.new_for_path(os.path.abspath(path)).get_uri()
+
+            # Создаём Settings
             settings = Gio.Settings.new('org.gnome.desktop.background')
 
-            # --- 🔑 Безопасная проверка наличия ключа ---
+            # Проверяем схему
             schema_source = Gio.SettingsSchemaSource.get_default()
             schema = schema_source.lookup('org.gnome.desktop.background', True)
 
-            if schema and schema.has_key('picture-uri-dark'):
-                # Устанавливаем отдельно для светлого и тёмного режима
-                settings.set_string('picture-uri', uri)
-                settings.set_string('picture-uri-dark', uri)
-                print(f"Обои установлены: {uri} (поддержка dark mode)")
+            if not schema:
+                print("❌ Схема org.gnome.desktop.background не найдена")
+                return
+
+            # Устанавливаем обои
+            if schema.has_key('picture-uri-dark'):
+                settings.set_string('picture-uri', file_uri)
+                settings.set_string('picture-uri-dark', file_uri)
+                print(f"✅ Обои установлены (с поддержкой тёмного режима): {file_uri}")
             else:
-                # Только общий ключ
-                settings.set_string('picture-uri', uri)
-                print(f"Обои установлены (без picture-uri-dark): {uri}")
+                settings.set_string('picture-uri', file_uri)
+                print(f"✅ Обои установлены: {file_uri}")
 
         except Exception as e:
-            # Даже если ошибка GIO, мы её перехватим
-            print(f"Ошибка установки обоев: {e}")
+            print(f"❌ Ошибка установки обоев: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
 

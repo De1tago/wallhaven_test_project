@@ -284,11 +284,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
         builder = Gtk.Builder.new_from_file(ui_path)
         xml_window = builder.get_object("main_window")
-        
-        header_bar = builder.get_object("header_bar")
-        if header_bar:
-            xml_window.set_titlebar(None)
-            self.set_titlebar(header_bar)
+
 
         content = xml_window.get_child()
         if content:
@@ -969,6 +965,7 @@ class MainWindow(Gtk.ApplicationWindow):
         # если контент не прокручивается
         GLib.idle_add(self.check_if_can_load_next_page)
 
+#------
 # --- FullImageWindow ---
 class FullImageWindow(Gtk.Window):
     """
@@ -1001,11 +998,6 @@ class FullImageWindow(Gtk.Window):
         self.set_default_size(w, h)
         self.set_title(f"Wallhaven - ID: {self.wallpaper_id}")
         
-        header_bar = builder.get_object("header_bar")
-        if header_bar:
-            xml_window.set_titlebar(None)
-            self.set_titlebar(header_bar)
-
         content = xml_window.get_child()
         if content:
             xml_window.set_child(None)

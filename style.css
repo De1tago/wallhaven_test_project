@@ -22,7 +22,7 @@
 /* Стили для заглушки (скелета) */
 .skeleton {
     background-color: @theme_bg_color;
-    opacity: 0.8;
+/*    opacity: 0.8;*/
 }
 
 .skeleton GtkSpinner {

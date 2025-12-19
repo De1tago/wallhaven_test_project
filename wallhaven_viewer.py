@@ -223,24 +223,24 @@ class WallpaperViewer(Gtk.Application):
     """
 
     def __init__(self):
-        super().__init__(application_id="org.wallhaven.viewer")
+        super().__init__(application_id="org.wallhaven.viewer",
+                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.window = None
 
     def do_activate(self):
-        """
-        Вызывается при активации приложения. Загружает стили и показывает главное окно.
-        """
-        provider = Gtk.CssProvider()
-        css_path = resolve_path("style.css")
-        try:
-            provider.load_from_path(css_path) 
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
-        except Exception as e:
-            print(f"Ошибка загрузки CSS из {css_path}: {e}")
-            
-        win = MainWindow(self)
-        win.present()
+        # Получаем объект настроек
+        settings = Gtk.Settings.get_default()
+        
+        # 1. Сбрасываем принудительную темную тему (ставим в False)
+        # Это позволяет системе самой решать, какой цвет использовать.
+        settings.set_property("gtk-application-prefer-dark-theme", False)
+        
+        # 2. Если вы на Linux (GNOME/KDE), добавим проверку системного конфига
+        # Это заставит GTK синхронизироваться с системной схемой
+        if not self.window:
+            self.window = MainWindow(self)
+        
+        self.window.present()
 
 
 class MainWindow(Gtk.ApplicationWindow):

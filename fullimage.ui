@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <requires lib="gtk" version="4.0"/>
-  <object class="GtkWindow" id="full_image_window">
-    <property name="default-width">1000</property>
-    <property name="default-height">700</property>
+  <object class="GtkBox" id="root">
     <child>
       <object class="GtkBox">
         <property name="orientation">vertical</property>

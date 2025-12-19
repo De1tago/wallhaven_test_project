@@ -9,9 +9,10 @@ Wallhaven Desktop Viewer
 
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GdkPixbuf, GLib, Gdk, Gio, GObject
-import requests
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf, GObject, Adw
 import threading
+import requests
 import os
 import configparser
 import sys
@@ -214,7 +215,7 @@ class SettingsWindow(Gtk.Window):
         self.close()
 
 # --- Приложение ---
-class WallpaperViewer(Gtk.Application):
+class WallpaperViewer(Adw.Application):
     """
     Основное приложение Wallhaven Viewer, наследующее Gtk.Application.
 
@@ -229,11 +230,11 @@ class WallpaperViewer(Gtk.Application):
 
     def do_activate(self):
         # Получаем объект настроек
-        settings = Gtk.Settings.get_default()
+        # settings = Gtk.Settings.get_default()
         
         # 1. Сбрасываем принудительную темную тему (ставим в False)
         # Это позволяет системе самой решать, какой цвет использовать.
-        settings.set_property("gtk-application-prefer-dark-theme", False)
+        # settings.set_property("gtk-application-prefer-dark-theme", False)
         
         # 2. Если вы на Linux (GNOME/KDE), добавим проверку системного конфига
         # Это заставит GTK синхронизироваться с системной схемой
@@ -243,7 +244,7 @@ class WallpaperViewer(Gtk.Application):
         self.window.present()
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(Adw.ApplicationWindow):
     """
     Главное окно приложения.
 
@@ -262,6 +263,7 @@ class MainWindow(Gtk.ApplicationWindow):
         super().__init__(application=app)
         self.set_title("Wallhaven Viewer")
         self.set_default_size(1200, 850)
+        self.style_manager = Adw.StyleManager.get_default()
 
         self.current_page = 1
         self.settings = load_settings()
@@ -282,15 +284,16 @@ class MainWindow(Gtk.ApplicationWindow):
             print(f"КРИТИЧЕСКАЯ ОШИБКА: Файл {ui_path} не найден!")
             return
 
-        builder = Gtk.Builder.new_from_file(ui_path)
-        xml_window = builder.get_object("main_window")
+        builder = Gtk.Builder.new_from_file(resolve_path("mainwindow.ui"))
+
+        content = builder.get_object("root")
+        if not content:
+            raise RuntimeError("root container not found in mainwindow.ui")
+
+        self.set_content(content)
+        self.builder = builder
 
 
-        content = xml_window.get_child()
-        if content:
-            xml_window.set_child(None)
-            self.set_child(content)
-        
         self.builder = builder
         self.entry = builder.get_object("entry")
         self.btn_search = builder.get_object("btn_search") 
@@ -991,7 +994,14 @@ class FullImageWindow(Gtk.Window):
         self.wallpaper_id = image_url.split('/')[-1].split('.')[0]
         
         ui_path = resolve_path("fullimage.ui")
-        builder = Gtk.Builder.new_from_file(ui_path)
+        builder = Gtk.Builder.new_from_file(resolve_path("fullimage.ui"))
+
+        content = builder.get_object("root")
+        if not content:
+            raise RuntimeError("root container not found in fullimage.ui")
+
+        self.set_content(content)
+
         xml_window = builder.get_object("full_image_window")
         
         w, h = xml_window.get_default_size()

@@ -12,7 +12,8 @@ finish-args:
   - --device=dri
   - --filesystem=home
   - --talk-name=org.freedesktop.portal.Desktop
-
+  - --metadata=X-DPI-Scale=1
+  
 modules:
   - name: python3-requests
     buildsystem: simple

@@ -20,8 +20,17 @@ import traceback
 import glob
 
 API_URL = "https://wallhaven.cc/api/v1/search"
-CONFIG_FILE = "config.ini"
+# --- НА ЭТОТ БЛОК ---
+def get_config_path():
+    """Возвращает путь к config.ini в папке ~/.config пользователя."""
+    # GLib.get_user_config_dir() автоматически вернет ~/.config 
+    # (или путь внутри песочницы Flatpak)
+    config_dir = os.path.join(GLib.get_user_config_dir(), "wallhaven-viewer")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
+    return os.path.join(config_dir, "config.ini")
 
+CONFIG_FILE = get_config_path()
 # --- ХЕЛПЕР ДЛЯ ПУТЕЙ ---
 def resolve_path(filename):
     """
@@ -86,7 +95,8 @@ def load_settings():
         dict: Словарь текущих или дефолтных настроек приложения.
     """
     config = configparser.ConfigParser()
-    config.read(resolve_path(CONFIG_FILE))
+    # config.read(resolve_path(CONFIG_FILE))
+    config.read(CONFIG_FILE)
     settings = DEFAULT_SETTINGS.copy()
     if 'Settings' in config:
         for key in settings:
@@ -103,7 +113,8 @@ def save_settings(settings_dict):
     """
     config = configparser.ConfigParser()
     config['Settings'] = {k: v for k, v in settings_dict.items() if k in DEFAULT_SETTINGS}
-    with open(resolve_path(CONFIG_FILE), 'w') as configfile:
+    # with open(resolve_path(CONFIG_FILE), 'w') as configfile:
+    with open(CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
 
 # --- SettingsWindow ---

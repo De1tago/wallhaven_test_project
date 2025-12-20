@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Wallhaven Viewer
+Comment=Browse and download wallpapers
+Exec=wallhaven-viewer
+Icon=cc.wallhaven.Viewer
+Terminal=false
+Categories=Utility;GTK;

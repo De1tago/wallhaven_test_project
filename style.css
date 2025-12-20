@@ -26,23 +26,24 @@
 }
 
 .skeleton GtkSpinner {
-    color: @theme_selected_bg_color;
+    color: @accent_bg_color;
 }
 
 /* Стили для скачанных обоев */
 .downloaded {
-    border-style: solid;
-    border-width: 2px;
-    border-color: #4CAF50; /* Зеленая рамка */
+/* Используем @accent_bg_color для системной обводки */
+    border: 2px solid @accent_bg_color;
+    border-radius: 6px;
 }
 
 /* Стиль для значка "Скачано" на миниатюрах */
 .download-indicator {
-    color: #4CAF50; /* Зеленый цвет */
-    font-size: 1.5em; /* Размер иконки */
-    text-shadow: 0px 0px 3px rgba(0, 0, 0, 0.5); /* Тень для видимости */
+/* Системный цвет текста для акцента (обычно белый) */
+    color: @accent_fg_color;            /* Цвет текста на акценте */
+    background-color: @accent_bg_color; /* Фон акцента */
+    padding: 4px;
+    border-radius: 4px;
 }
-
 /* Стили для InfoBar */
 .error {
     background-color: @error_bg_color;

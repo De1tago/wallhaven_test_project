@@ -10,7 +10,11 @@
           <object class="GtkBox" id="main_vbox">
             <property name="orientation">vertical</property>
             <property name="spacing">0</property>
-
+              <child>
+                <object class="AdwHeaderBar" id="header_bar">
+                  <property name="show-end-title-buttons">true</property>
+                </object>
+            </child>  
             <child>
               <object class="GtkBox" id="top_toolbar">
                 <property name="orientation">horizontal</property>

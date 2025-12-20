@@ -25,15 +25,15 @@ CONFIG_FILE = "wallhaven_viewer.ini"
 # --- ХЕЛПЕР ДЛЯ ПУТЕЙ ---
 def resolve_path(filename):
     """
-    Возвращает абсолютный путь к файлу относительно расположения скрипта.
-
-    Args:
-        filename (str): Имя файла (например, 'style.css' или 'config.ini').
-
-    Returns:
-        str: Полный, абсолютный путь к файлу.
+    Возвращает путь к файлу, учитывая особенности работы PyInstaller.
     """
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        # Если приложение запущено как скомпилированный файл
+        base_dir = sys._MEIPASS
+    else:
+        # Если приложение запущено как обычный скрипт .py
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+    
     return os.path.join(base_dir, filename)
 
 # --- КОНСТАНТЫ ---
@@ -224,20 +224,26 @@ class WallpaperViewer(Adw.Application):
     """
 
     def __init__(self):
-        super().__init__(application_id="org.wallhaven.viewer",
+        super().__init__(application_id="cc.wallhaven.Viewer",
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.window = None
 
     def do_activate(self):
-        # Получаем объект настроек
-        # settings = Gtk.Settings.get_default()
-        
-        # 1. Сбрасываем принудительную темную тему (ставим в False)
-        # Это позволяет системе самой решать, какой цвет использовать.
-        # settings.set_property("gtk-application-prefer-dark-theme", False)
-        
-        # 2. Если вы на Linux (GNOME/KDE), добавим проверку системного конфига
-        # Это заставит GTK синхронизироваться с системной схемой
+        # Загрузка CSS стилей
+        css_provider = Gtk.CssProvider()
+        # Gio.File.new_for_path нужен для load_from_file в новых версиях GTK, 
+        # но load_from_path тоже работает.
+        try:
+            css_provider.load_from_path(resolve_path("style.css"))
+            Gtk.StyleContext.add_provider_for_display(
+                Gdk.Display.get_default(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+        except Exception as e:
+            print(f"Ошибка загрузки style.css: {e}")
+
+        # Создаем и показываем окно (без дублей)
         if not self.window:
             self.window = MainWindow(self)
         
@@ -264,7 +270,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title("Wallhaven Viewer")
         self.set_default_size(1200, 850)
         self.style_manager = Adw.StyleManager.get_default()
-
+        
         self.current_page = 1
         self.settings = load_settings()
         self.current_query = self.settings['last_query']
@@ -1000,7 +1006,7 @@ class FullImageWindow(Gtk.Window):
         if not content:
             raise RuntimeError("root container not found in fullimage.ui")
 
-        self.set_content(content)
+        self.set_child(content)
 
         xml_window = builder.get_object("full_image_window")
         

@@ -20,7 +20,7 @@ import traceback
 import glob
 
 API_URL = "https://wallhaven.cc/api/v1/search"
-CONFIG_FILE = "wallhaven_viewer.ini"
+CONFIG_FILE = "config.ini"
 
 # --- ХЕЛПЕР ДЛЯ ПУТЕЙ ---
 def resolve_path(filename):

@@ -576,36 +576,26 @@ class MainWindow(Adw.ApplicationWindow):
 
 
     def show_about_dialog(self, action, param):
-        """Показывает окно 'О приложении', совместимое с ранними версиями Libadwaita."""
+        """Максимально совместимое окно 'О приложении'."""
         
-        icon_name = "preferences-desktop-wallpaper"  # Имя по умолчанию
+        # Регистрируем путь к иконке, чтобы GTK нашел её по короткому имени
         icon_path = os.path.join(os.path.dirname(__file__), "app-icon.png")
-
-        # Если файл иконки существует, пробуем "обмануть" систему
         if os.path.exists(icon_path):
-            try:
-                # Регистрируем путь к папке с нашей иконкой в поисковой системе GTK
-                icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
-                icon_theme.add_search_path(os.path.dirname(__file__))
-                
-                # Теперь GTK сможет найти "app-icon" (без расширения), 
-                # если файл называется app-icon.png
-                icon_name = "app-icon" 
-            except Exception as e:
-                print(f"Ошибка регистрации иконки: {e}")
+            theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+            theme.add_search_path(os.path.dirname(__file__))
 
         about = Adw.AboutWindow(
             transient_for=self,
             application_name="Wallhaven Viewer",
-            application_icon=icon_name, # Передаем строку (имя)
-            developer_name="De1tago",
+            # В версии 1.0 свойство называется 'application_icon'
+            application_icon="cc.wallhaven.Viewer", 
+            developer_name="OOOTMYV_DENEG",
             version="1.0",
             comments="Просмотр и скачивание обоев с Wallhaven.cc",
             website="https://wallhaven.cc",
             copyright="© 2025 Vadim",
             license_type=Gtk.License.MIT_X11,
         )
-
         about.present()
         
     def check_api_key_on_purity_change(self, toggle_button):

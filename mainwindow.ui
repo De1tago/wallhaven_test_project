@@ -13,9 +13,16 @@
               <child>
                 <object class="AdwHeaderBar" id="header_bar">
                   <property name="show-end-title-buttons">true</property>
+                  
+                  <child type="end">
+                  <object class="GtkMenuButton" id="primary_menu_btn">
+                    <property name="icon-name">open-menu-symbolic</property>
+                    <property name="tooltip-text">Меню</property>
+                  </object>
+                </child>
                 </object>
-            </child>  
-            <child>
+              </child>  
+              <child>
               <object class="GtkBox" id="top_toolbar">
                 <property name="orientation">horizontal</property>
                 <property name="spacing">10</property>
@@ -42,13 +49,6 @@
                   <object class="GtkToggleButton" id="btn_downloaded">
                     <property name="label">Скачанные</property>
                     <property name="icon-name">folder-download-symbolic</property>
-                  </object>
-                </child>
-
-                <child>
-                  <object class="GtkButton" id="btn_settings">
-                    <property name="icon-name">preferences-system-symbolic</property>
-                    <property name="tooltip-text">Настройки</property>
                   </object>
                 </child>
               </object>

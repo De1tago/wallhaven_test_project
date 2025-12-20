@@ -314,7 +314,13 @@ class MainWindow(Adw.ApplicationWindow):
         self.builder = builder
         self.entry = builder.get_object("entry")
         self.btn_search = builder.get_object("btn_search") 
-        self.btn_settings = builder.get_object("btn_settings") 
+
+        # self.btn_settings = builder.get_object("btn_settings") 
+        # --- ДОБАВЛЯЕМ НОВУЮ ЛОГИКУ МЕНЮ ---
+        self.primary_menu_btn = builder.get_object("primary_menu_btn")
+        self.setup_menu_actions()
+        # -----------------------------------
+
         self.btn_general = builder.get_object("btn_general")
         self.btn_anime = builder.get_object("btn_anime")
         self.btn_people = builder.get_object("btn_people")
@@ -358,7 +364,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Подключение сигналов
         self.btn_search.connect("clicked", self.on_search_clicked)
-        self.btn_settings.connect("clicked", self.open_settings)
+        # self.btn_settings.connect("clicked", self.open_settings)
         self.btn_downloaded.connect("clicked", self.on_downloaded_toggle) 
         
         btn_infobar_close = builder.get_object("btn_infobar_close")
@@ -382,6 +388,31 @@ class MainWindow(Adw.ApplicationWindow):
         # --- ЗАПУСК ---
         self.scan_downloaded_wallpapers() 
         self.start_new_search(self.current_query)
+
+
+    def setup_menu_actions(self):
+        """Создает меню и привязывает действия (Actions)."""
+        # 1. Создаем группу действий для окна
+        action_group = Gio.SimpleActionGroup()
+        self.insert_action_group("win", action_group)
+
+        # 2. Действие "Настройки"
+        action_settings = Gio.SimpleAction.new("preferences", None)
+        action_settings.connect("activate", self.open_settings)
+        action_group.add_action(action_settings)
+
+        # 3. Действие "О приложении"
+        action_about = Gio.SimpleAction.new("about", None)
+        action_about.connect("activate", self.show_about_dialog)
+        action_group.add_action(action_about)
+
+        # 4. Создаем модель меню
+        menu = Gio.Menu()
+        menu.append("Настройки", "win.preferences")
+        menu.append("О приложении", "win.about")
+
+        # 5. Привязываем меню к кнопке
+        self.primary_menu_btn.set_menu_model(menu)    
         
     def scan_downloaded_wallpapers(self):
         """
@@ -539,9 +570,26 @@ class MainWindow(Adw.ApplicationWindow):
         if old_cols != new_cols or old_key != new_settings['api_key']:
             self.start_new_search(self.current_query)
 
-    def open_settings(self, widget):
+    def open_settings(self, action, param):
         """Открывает окно настроек (SettingsWindow)."""
         SettingsWindow(self).present()
+
+
+    def show_about_dialog(self, action, param):
+        """Показывает красивое окно 'О приложении' (Adw.AboutWindow)."""
+        about = Adw.AboutWindow(
+            transient_for=self,
+            application_name="Wallhaven Viewer",
+            application_icon="preferences-desktop-wallpaper", # Или ваш ID иконки
+            developer_name="Ваше Имя",
+            version="1.0",
+            comments="Просмотр и скачивание обоев с Wallhaven.cc",
+            website="https://wallhaven.cc",
+            issue_url="https://github.com/your/repo/issues", # Если есть
+            copyright="© 2025 Ваше Имя",
+            license_type=Gtk.License.MIT_X11, # Выберите нужную лицензию
+        )
+        about.present()    
         
     def check_api_key_on_purity_change(self, toggle_button):
         """

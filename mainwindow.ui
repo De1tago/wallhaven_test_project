@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <object class="GtkBox" id="root">
+
+    <child>
+      <object class="GtkOverlay">
+        <child>
+          <object class="GtkBox" id="main_vbox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">0</property>
+              <child>
+                <object class="AdwHeaderBar" id="header_bar">
+                  <property name="show-end-title-buttons">true</property>
+                </object>
+            </child>  
+            <child>
+              <object class="GtkBox" id="top_toolbar">
+                <property name="orientation">horizontal</property>
+                <property name="spacing">10</property>
+                <property name="margin-start">10</property>
+                <property name="margin-end">10</property>
+                <property name="margin-top">10</property>
+                <property name="margin-bottom">5</property>
+
+                <child>
+                  <object class="GtkButton" id="btn_search">
+                    <property name="icon-name">view-refresh-symbolic</property>
+                    <property name="tooltip-text">Обновить поиск</property>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkSearchEntry" id="entry">
+                    <property name="placeholder-text">Поиск (оставьте пустым для топа)...</property>
+                    <property name="hexpand">true</property>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkToggleButton" id="btn_downloaded">
+                    <property name="label">Скачанные</property>
+                    <property name="icon-name">folder-download-symbolic</property>
+                  </object>
+                </child>
+
+                <child>
+                  <object class="GtkButton" id="btn_settings">
+                    <property name="icon-name">preferences-system-symbolic</property>
+                    <property name="tooltip-text">Настройки</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+                <object class="GtkSeparator">
+                    <property name="orientation">horizontal</property>
+                </object>
+            </child>
+
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="vscrollbar-policy">never</property>
+                <property name="hscrollbar-policy">automatic</property>
+                <property name="min-content-height">50</property>
+                <property name="vexpand">false</property>
+                <child>
+                  <object class="GtkBox" id="filters_box">
+                    <property name="orientation">horizontal</property>
+                    <property name="spacing">15</property>
+                    <property name="halign">center</property>
+                    <property name="margin-start">15</property>
+                    <property name="margin-end">15</property>
+                    <property name="margin-top">10</property>
+                    <property name="margin-bottom">10</property>
+                    
+                    <child>
+                      <object class="GtkBox" id="cat_box">
+                        <property name="orientation">horizontal</property>
+                        <style>
+                          <class name="linked"/>
+                        </style>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_general">
+                            <property name="label">General</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_anime">
+                            <property name="label">Anime</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_people">
+                            <property name="label">People</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkBox" id="purity_box">
+                        <property name="orientation">horizontal</property>
+                        <style>
+                          <class name="linked"/>
+                        </style>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_sfw">
+                            <property name="label">SFW</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_sketchy">
+                            <property name="label">Sketchy</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="btn_nsfw">
+                            <property name="label">NSFW</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label">Разрешение:</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkDropDown" id="res_dropdown"/>
+                    </child>
+
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label">Соотношение:</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkDropDown" id="ratio_dropdown"/>
+                    </child>
+                    
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label">Сортировка:</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkDropDown" id="sort_dropdown"/>
+                    </child>
+                    
+                  </object>
+                </child>
+              </object>
+            </child>
+            
+            <child>
+                <object class="GtkSeparator"/>
+            </child>
+
+            <child>
+              <object class="GtkScrolledWindow" id="scrolled">
+                <property name="vexpand">true</property>
+                <property name="hexpand">true</property>
+                <child>
+                  <object class="GtkBox" id="content_box">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">20</property>
+                    <property name="margin-top">10</property>
+                    <property name="margin-bottom">10</property>
+                    <property name="margin-start">10</property>
+                    <property name="margin-end">10</property>
+                    <child>
+                      <object class="GtkFlowBox" id="flowbox">
+                        <property name="valign">start</property>
+                        <property name="halign">fill</property>
+                        <property name="hexpand">true</property>
+                        <property name="column-spacing">10</property>
+                        <property name="row-spacing">10</property>
+                        <property name="selection-mode">none</property>
+                        <property name="homogeneous">true</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSpinner" id="bottom_spinner">
+                        <property name="width-request">32</property>
+                        <property name="height-request">32</property>
+                        <property name="halign">center</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+        
+        <child type="overlay">
+          <object class="GtkInfoBar" id="infobar">
+            <property name="visible">false</property>
+            <property name="halign">center</property>
+            <property name="valign">start</property>
+            <property name="margin-top">20</property>
+            <style>
+              <class name="error"/>
+            </style>
+            <child>
+              <object class="GtkLabel" id="infobar_label"/>
+            </child>
+            <child type="action">
+              <object class="GtkButton" id="btn_infobar_close">
+                <property name="label">Закрыть</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+      </object>
+    </child>
+  </object>
+</interface>

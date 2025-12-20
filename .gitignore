@@ -1,0 +1,7 @@
+build/
+dist/
+build-dir/
+.flatpak-builder/
+__pycache__/
+wallhaven_viewer.ini
+*.pkg

@@ -1,0 +1,60 @@
+/*
+ * Общие стили для Wallhaven Viewer
+ */
+
+/* Стили для кнопок-миниатюр */
+.thumbnail {
+    border-radius: 6px;
+    padding: 0; /* Убираем стандартный отступ кнопки */
+    transition: 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: none;
+}
+
+.thumbnail:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: scale(1.02);
+}
+
+.thumbnail GtkPicture {
+    border-radius: 6px;
+}
+
+/* Стили для заглушки (скелета) */
+.skeleton {
+    background-color: @theme_bg_color;
+/*    opacity: 0.8;*/
+}
+
+.skeleton GtkSpinner {
+    color: @accent_bg_color;
+}
+
+/* Стили для скачанных обоев */
+.downloaded {
+/* Используем @accent_bg_color для системной обводки */
+    border: 2px solid @accent_bg_color;
+    border-radius: 6px;
+}
+
+/* Стиль для значка "Скачано" на миниатюрах */
+.download-indicator {
+/* Системный цвет текста для акцента (обычно белый) */
+    color: @accent_fg_color;            /* Цвет текста на акценте */
+    background-color: @accent_bg_color; /* Фон акцента */
+    padding: 4px;
+    border-radius: 4px;
+}
+/* Стили для InfoBar */
+.error {
+    background-color: @error_bg_color;
+    color: @error_fg_color;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+/* Стили для HeaderBar */
+GtkHeaderBar {
+    padding-left: 10px;
+    padding-right: 10px;
+    border-bottom: 1px solid @borders;
+}

@@ -1,0 +1,51 @@
+app-id: cc.wallhaven.Viewer
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+command: wallhaven-viewer
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.portal.Desktop
+
+modules:
+  - name: python3-requests
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --prefix=/app requests
+    sources:
+      - type: shell
+        commands:
+          - ""
+
+  - name: wallhaven-viewer
+    buildsystem: simple
+    build-commands:
+      # 1. Создаем дерево папок
+      - mkdir -p /app/lib/wallhaven-viewer
+      - mkdir -p /app/bin
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/256x256/apps
+      - mkdir -p /app/share/icons/hicolor/scalable/apps
+      
+      
+      # 2. Копируем файлы кода (используем кавычки для безопасности)
+      - "install -m 644 wallhaven_viewer.py mainwindow.ui fullimage.ui style.css /app/lib/wallhaven-viewer/"
+      
+      # 3. Устанавливаем запускатор
+      - "install -m 755 wallhaven-viewer-wrapper.sh /app/bin/wallhaven-viewer"
+      
+      # 4. Устанавливаем Desktop-файл и Иконку
+      - "install -m 644 cc.wallhaven.Viewer.desktop /app/share/applications/cc.wallhaven.Viewer.desktop"
+      - "install -m 644 app-icon.png /app/share/icons/hicolor/256x256/apps/cc.wallhaven.Viewer.png"
+    sources:
+      - type: dir
+        path: .

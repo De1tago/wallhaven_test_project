@@ -16,9 +16,9 @@ import requests
 import os
 import configparser
 import sys
-import traceback
+
 import glob
-import dbus
+
 
 API_URL = "https://wallhaven.cc/api/v1/search"
 # --- НА ЭТОТ БЛОК ---
@@ -1197,6 +1197,7 @@ class FullImageWindow(Gtk.Window):
         Args:
             pixbuf (GdkPixbuf.Pixbuf): Загруженное изображение.
         """
+        
         # --- ВОЗВРАТ К РАБОЧЕМУ МЕТОДУ (Gdk.Texture.new_for_pixbuf) ---
         texture = Gdk.Texture.new_for_pixbuf(pixbuf)
         # -------------------------------------------------------------------
@@ -1283,36 +1284,47 @@ class FullImageWindow(Gtk.Window):
             print(f"Ошибка сохранения: {e}")
 
     def on_set_wallpaper_clicked(self, button):
-        if not self.local_path:
-            print("❌ Нет локального пути — нельзя установить как обои")
-            return
-
-        if not os.path.exists(self.local_path):
-            print(f"❌ Файл не найден: {self.local_path}")
+        if not self.local_path or not os.path.exists(self.local_path):
+            print("❌ Нет локального файла — нельзя установить обои")
             return
 
         try:
             import dbus
+            import dbus.types
+
             bus = dbus.SessionBus()
-            obj = bus.get_object('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop')
-            interface = dbus.Interface(obj, 'org.freedesktop.portal.Wallpaper')
+            obj = bus.get_object(
+                'org.freedesktop.portal.Desktop',
+                '/org/freedesktop/portal/desktop'
+            )
+            iface = dbus.Interface(
+                obj,
+                'org.freedesktop.portal.Wallpaper'
+            )
 
-            abs_path = os.path.abspath(self.local_path)
-            uri = f"file://{abs_path}"
-            parent_window = ""  # Flatpak требует строку
+            fd = os.open(self.local_path, os.O_RDONLY)
 
-            options = {
-                'show-preview': dbus.Boolean(True, variant_level=1),
-                'portal-version': dbus.UInt32(1, variant_level=1)
-            }
+            try:
+                options = {
+                    'show-preview': dbus.Boolean(False, variant_level=1)
+                }
 
-            interface.SetWallpaperURI(parent_window, uri, options)
-            print(f"✅ Установлено как обои: {uri}")
+                iface.SetWallpaperFile(
+                    "",
+                    dbus.types.UnixFd(fd),   # ← ВОТ ЗДЕСЬ
+                    options
+                )
+
+                print(f"✅ Установлено как обои (без деградации): {self.local_path}")
+
+            finally:
+                os.close(fd)
 
         except dbus.DBusException as e:
             print(f"❌ D-Bus ошибка: {e}")
         except Exception as e:
             print(f"❌ Неизвестная ошибка: {e}")
+
 
     def _set_wallpaper_worker(self, path):
         """

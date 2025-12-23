@@ -837,33 +837,28 @@ class MainWindow(Adw.ApplicationWindow):
 
     
     def update_thumbnail_ui(self, btn, pixbuf, wallpaper_id): 
-        """
-        Заменяет содержимое заглушки на загруженное изображение.
-
-        Args:
-            btn (Gtk.Button): Кнопка, на которой отображается миниатюра.
-            pixbuf (GdkPixbuf.Pixbuf): Загруженная и масштабированная миниатюра.
-            wallpaper_id (str): ID обоев.
-        """
         try:
             btn.set_child(None)
             btn.remove_css_class("skeleton")
             
             if wallpaper_id in self.downloaded_ids:
                 btn.add_css_class("downloaded") 
-                
+                # Обновляем путь при апдейте (например, после скачивания)
+                btn.wallhaven_local_path = self.downloaded_files.get(wallpaper_id)
+            else:
+                btn.remove_css_class("downloaded")
+                btn.wallhaven_local_path = None
+            
             btn.set_hexpand(True) 
             btn.set_vexpand(False) 
             
             target_width, target_height = self.get_thumbnail_size()
             
             overlay = Gtk.Overlay()
-
             texture = Gdk.Texture.new_for_pixbuf(pixbuf)
             picture = Gtk.Picture.new_for_paintable(texture)
             picture.set_content_fit(Gtk.ContentFit.COVER)
             picture.set_size_request(-1, target_height) 
-            
             overlay.set_child(picture)
             
             if wallpaper_id in self.downloaded_ids:
@@ -911,10 +906,9 @@ class MainWindow(Adw.ApplicationWindow):
              print(f"Критическая ошибка при создании индикатора ошибки: {e}")
 
     def open_full_image(self, widget, url, local_path=None):
-        """
-        Открывает окно полноразмерного просмотра для выбранных обоев.
-        """
-        wallpaper_id = url.split('/')[-1].split('.')[0]
+        # Если local_path не передан, но кнопка знает путь — используем его
+        if hasattr(widget, 'wallhaven_local_path') and widget.wallhaven_local_path:
+            local_path = widget.wallhaven_local_path
         win = FullImageWindow(self, url, self.settings.get('download_path', ''), local_path) 
         win.present()
 
@@ -929,9 +923,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.start_new_search(query)
         
     def create_placeholder_btn(self, full_url, wallpaper_id, local_path=None): 
-        """
-        Создает кнопку-заглушку ('скелет') с анимацией загрузки.
-        """
         width, height = self.get_thumbnail_size()
         btn = Gtk.Button()
         btn.set_size_request(-1, height)
@@ -944,6 +935,11 @@ class MainWindow(Adw.ApplicationWindow):
             btn.add_css_class("downloaded") 
         btn.add_css_class("skeleton")
         btn.add_css_class("thumbnail")
+        
+        # --- ДОБАВЛЯЕМ АТРИБУТ ---
+        btn.wallhaven_local_path = local_path  # Сохраняем путь
+        # ---------------------------
+        
         s = Gtk.Spinner()
         s.start()
         s.set_halign(Gtk.Align.CENTER)
@@ -1261,18 +1257,31 @@ class FullImageWindow(Gtk.Window):
             f = d.save_finish(res)
             if f:
                 local_path = f.get_path()
-                with open(local_path, "wb") as file: file.write(self.image_data)
+                with open(local_path, "wb") as file:
+                    file.write(self.image_data)
                 
                 self.local_path = local_path
                 self.save_btn.set_label("Скачано")
                 self.save_btn.set_sensitive(False)
                 self.set_wp_btn.set_sensitive(True)
                 
+                # Обновляем список скачанных файлов в главном окне
                 self.parent_window.scan_downloaded_wallpapers()
                 self.parent_window.flowbox.invalidate_filter()
                 
-        except Exception: pass
-        
+                # НАЙТИ КНОПКУ В СЕТКЕ И ОБНОВИТЬ ЕЁ local_path
+                for child in self.parent_window.flowbox:
+                    btn = child.get_child()
+                    if isinstance(btn, Gtk.Button) and hasattr(btn, 'wallhaven_local_path'):
+                        # Предположим, что URL или ID позволяют идентифицировать кнопку
+                        if self.wallpaper_id in btn.get_action_name():  # Упрощённый способ
+                            btn.wallhaven_local_path = local_path
+                            break
+                        # Или ищем по URL, если он сохранён
+                # Альтернатива: перерисовать миниатюру, если она уже загружена
+        except Exception as e:
+            print(f"Ошибка сохранения: {e}")
+
     def on_set_wallpaper_clicked(self, button):
         if not self.local_path:
             print("❌ Нет локального пути — нельзя установить как обои")

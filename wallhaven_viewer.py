@@ -18,6 +18,7 @@ import configparser
 import sys
 import traceback
 import glob
+import dbus
 
 API_URL = "https://wallhaven.cc/api/v1/search"
 # --- НА ЭТОТ БЛОК ---
@@ -308,7 +309,7 @@ class MainWindow(Adw.ApplicationWindow):
             raise RuntimeError("root container not found in mainwindow.ui")
 
         self.set_content(content)
-        self.builder = builder
+
 
 
         self.builder = builder
@@ -1082,7 +1083,7 @@ class FullImageWindow(Gtk.Window):
         
         content = xml_window.get_child()
         if content:
-            xml_window.set_child(None)
+            content.unparent()  # <-- Это критически важно!
             self.set_child(content)
 
         self.picture = builder.get_object("picture")
@@ -1272,25 +1273,37 @@ class FullImageWindow(Gtk.Window):
                 
         except Exception: pass
         
-    def on_set_wallpaper_clicked(self, btn):
-        """
-        Устанавливает локальное изображение как обои.
-        """
+    def on_set_wallpaper_clicked(self, button):
         if not self.local_path:
             print("❌ Нет локального пути — нельзя установить как обои")
             return
 
         if not os.path.exists(self.local_path):
             print(f"❌ Файл не найден: {self.local_path}")
-            self.show_error_dialog("Файл не найден", "Изображение было перемещено или удалено.")
             return
 
-        # Показываем обратную связь
-        btn.set_icon_name("object-select-symbolic")
-        GLib.timeout_add(1500, lambda: btn.set_icon_name("preferences-desktop-wallpaper-symbolic"))
+        try:
+            import dbus
+            bus = dbus.SessionBus()
+            obj = bus.get_object('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop')
+            interface = dbus.Interface(obj, 'org.freedesktop.portal.Wallpaper')
 
-        # Запускаем в потоке
-        threading.Thread(target=self._set_wallpaper_worker, args=(self.local_path,), daemon=True).start()
+            abs_path = os.path.abspath(self.local_path)
+            uri = f"file://{abs_path}"
+            parent_window = ""  # Flatpak требует строку
+
+            options = {
+                'show-preview': dbus.Boolean(True, variant_level=1),
+                'portal-version': dbus.UInt32(1, variant_level=1)
+            }
+
+            interface.SetWallpaperURI(parent_window, uri, options)
+            print(f"✅ Установлено как обои: {uri}")
+
+        except dbus.DBusException as e:
+            print(f"❌ D-Bus ошибка: {e}")
+        except Exception as e:
+            print(f"❌ Неизвестная ошибка: {e}")
 
     def _set_wallpaper_worker(self, path):
         """
@@ -1325,7 +1338,7 @@ class FullImageWindow(Gtk.Window):
             print(f"❌ Ошибка установки обоев: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
-
+    
 
 if __name__ == "__main__":
     app = WallpaperViewer()

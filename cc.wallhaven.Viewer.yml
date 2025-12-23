@@ -13,7 +13,14 @@ finish-args:
   - --filesystem=home
   - --talk-name=org.freedesktop.portal.Desktop
   - --metadata=X-DPI-Scale=1
-  
+  - --filesystem=xdg-run/dconf
+  - --filesystem=~/.config/dconf:ro
+  - --talk-name=ca.desrt.dconf
+  - --env=DCONF_USER_CONFIG_DIR=.config/dconf
+  - --talk-name=org.freedesktop.portal.Wallpaper
+  - --talk-name=org.freedesktop.impl.portal.Wallpaper
+
+
 modules:
   - name: python3-requests
     buildsystem: simple
@@ -21,7 +28,7 @@ modules:
       build-args:
         - --share=network
     build-commands:
-      - pip3 install --prefix=/app requests
+        - pip3 install --prefix=/app requests dbus-python
     sources:
       - type: shell
         commands:

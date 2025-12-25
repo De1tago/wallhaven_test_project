@@ -1,0 +1,8 @@
+# Библиотеки для работы приложения
+requests
+dbus-python
+
+# Инструменты для сборки (нужны только разработчику)
+pyinstaller
+packaging
+setuptools

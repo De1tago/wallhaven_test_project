@@ -446,7 +446,7 @@ class MainWindow(Adw.ApplicationWindow):
                 wallpaper_id = name
                 if wallpaper_id:
                     self.downloaded_files[wallpaper_id] = file_path
-                    print(f"✅ Найдено: ID={wallpaper_id} → {file_path}")
+                    # print(f"✅ Найдено: ID={wallpaper_id} → {file_path}")
 
         self.downloaded_ids = set(self.downloaded_files.keys())
         print(f"✅ Найдено скачанных обоев: {len(self.downloaded_ids)}")
@@ -791,7 +791,7 @@ class MainWindow(Adw.ApplicationWindow):
             # 2. КЭШ
             if cache_path and os.path.exists(cache_path):
                 try:
-                    print(f"🔍 Попытка загрузки из кэша: {cache_path}")
+                    # print(f"🔍 Попытка загрузки из кэша: {cache_path}")
                     img_data = open(cache_path, "rb").read()
                     if len(img_data) < 100:
                         raise ValueError("Кэш слишком мал")
@@ -805,7 +805,7 @@ class MainWindow(Adw.ApplicationWindow):
             # 3. СЕТЬ
             if pixbuf is None and thumb_url:
                 try:
-                    print(f"🔍 Попытка загрузки из сети: {thumb_url}")
+                    # print(f"🔍 Попытка загрузки из сети: {thumb_url}")
                     resp = requests.get(thumb_url, timeout=15)
                     resp.raise_for_status()
                     img_data = resp.content
@@ -820,7 +820,7 @@ class MainWindow(Adw.ApplicationWindow):
                         try:
                             with open(cache_path, "wb") as f:
                                 f.write(img_data)
-                            print(f"✅ Сохранено в кэш: {cache_path}")
+                            # print(f"✅ Сохранено в кэш: {cache_path}")
                         except Exception as e:
                             print(f"⚠️ Не удалось сохранить кэш: {e}")
                 except Exception as e:

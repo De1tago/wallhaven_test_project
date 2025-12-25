@@ -32,7 +32,8 @@ modules:
     sources:
       - type: shell
         commands:
-          - ""
+          - mkdir -p /app/lib/wallhaven-viewer
+          - mkdir -p /app/bin
 
   - name: wallhaven-viewer
     buildsystem: simple

@@ -6,4 +6,5 @@ __pycache__/
 config.ini
 *.pkg
 repo/
-cc.wallhaven.Viewer.flatpak
+*.flatpak
+*.spec

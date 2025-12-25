@@ -747,7 +747,7 @@ class MainWindow(Adw.ApplicationWindow):
                     if file_size < 100:
                         raise ValueError("Файл слишком мал")
 
-                    print(f"🔍 Попытка загрузки локальной миниатюры: {local_path} ({file_size} байт)")
+                    # print(f"🔍 Попытка загрузки локальной миниатюры: {local_path} ({file_size} байт)")
 
                     # Попробуем создать Pixbuf с обработкой ошибок
                     loader = GdkPixbuf.PixbufLoader()
@@ -765,7 +765,7 @@ class MainWindow(Adw.ApplicationWindow):
 
                     width = original_pixbuf.get_width()
                     height = original_pixbuf.get_height()
-                    print(f"✅ Загружено: {width}x{height}")
+                    # print(f"✅ Загружено: {width}x{height}")
 
                     # Масштабируем
                     scale_factor = min(target_width / width, target_height / height)
@@ -781,7 +781,7 @@ class MainWindow(Adw.ApplicationWindow):
                         GdkPixbuf.InterpType.BILINEAR
                     )
                     if pixbuf:
-                        print(f"✅ Масштабировано: {new_width}x{new_height}")
+                        # print(f"✅ Масштабировано: {new_width}x{new_height}")
                         GLib.idle_add(self.update_thumbnail_ui, placeholder_btn, pixbuf, wallpaper_id)
                         return
 
@@ -940,8 +940,8 @@ class MainWindow(Adw.ApplicationWindow):
         btn.wallhaven_local_path = local_path  # Сохраняем путь
         # ---------------------------
         
-        s = Gtk.Spinner()
-        s.start()
+        s = Adw.Spinner()
+        # s.start()  <-- УДАЛЯЕМ ЭТУ СТРОКУ
         s.set_halign(Gtk.Align.CENTER)
         s.set_valign(Gtk.Align.CENTER)
         btn.set_child(s)
@@ -982,7 +982,7 @@ class MainWindow(Adw.ApplicationWindow):
             
         if page > 1:
             self.bottom_spinner.set_visible(True)
-            self.bottom_spinner.start()
+            # self.bottom_spinner.start()
 
         def worker():
             params = self.get_api_params(query, page)
@@ -1030,7 +1030,7 @@ class MainWindow(Adw.ApplicationWindow):
         """
         self.is_loading = False
         self.has_more_pages = has_more
-        self.bottom_spinner.stop()
+        # self.bottom_spinner.stop()
         self.bottom_spinner.set_visible(False)
 
         # Попробуем подгрузить следующую страницу сразу,
@@ -1115,7 +1115,6 @@ class FullImageWindow(Gtk.Window):
             self.progress_bar.set_fraction(fraction)
             self.progress_bar.set_text(f"Загрузка: {percent}%")
             self.progress_bar.set_visible(True)
-            self.spinner.stop()
             self.spinner.set_visible(False)
 
     def load_image_and_info(self, local_mode=False):
@@ -1156,7 +1155,7 @@ class FullImageWindow(Gtk.Window):
                 self.image_data = b''
                 
                 if total_bytes == 0:
-                    GLib.idle_add(self.spinner.start)
+                    GLib.idle_add(lambda: self.spinner.set_visible(True))
                 else:
                     GLib.idle_add(self.update_progress, 0, total_bytes) 
                 
@@ -1167,7 +1166,7 @@ class FullImageWindow(Gtk.Window):
                         GLib.idle_add(self.update_progress, current_bytes, total_bytes)
             
             except Exception:
-                GLib.idle_add(self.spinner.stop)
+                GLib.idle_add(lambda: self.spinner.set_visible(False)) # Скрываем вместо stop
                 GLib.idle_add(lambda: self.progress_bar.set_visible(False))
                 self.image_data = None
 
@@ -1181,7 +1180,7 @@ class FullImageWindow(Gtk.Window):
             except Exception as e:
                 print(f"Ошибка: {e}")
         else:
-            GLib.idle_add(self.spinner.stop)
+            GLib.idle_add(lambda: self.progress_bar.set_visible(False))
 
 
     def update_title(self, resolution):
@@ -1203,7 +1202,7 @@ class FullImageWindow(Gtk.Window):
         # -------------------------------------------------------------------
         
         self.picture.set_paintable(texture)
-        self.spinner.stop()
+        self.spinner.set_visible(False)
         self.spinner.set_visible(False)
         self.progress_bar.set_visible(False)
         

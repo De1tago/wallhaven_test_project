@@ -183,7 +183,7 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkSpinner" id="bottom_spinner">
+                      <object class="AdwSpinner" id="bottom_spinner">
                         <property name="width-request">32</property>
                         <property name="height-request">32</property>
                         <property name="halign">center</property>

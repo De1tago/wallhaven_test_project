@@ -25,10 +25,9 @@
 /*    opacity: 0.8;*/
 }
 
-.skeleton GtkSpinner {
+.skeleton AdwSpinner {
     color: @accent_bg_color;
 }
-
 /* Стили для скачанных обоев */
 .downloaded {
 /* Используем @accent_bg_color для системной обводки */

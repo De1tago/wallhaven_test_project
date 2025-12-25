@@ -62,8 +62,7 @@
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <child>
-                  <object class="GtkSpinner" id="spinner">
-                    <property name="spinning">true</property>
+                  <object class="AdwSpinner" id="spinner">
                     <property name="width-request">64</property>
                     <property name="height-request">64</property>
                     <property name="halign">center</property>

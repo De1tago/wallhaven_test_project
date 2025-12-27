@@ -2,8 +2,12 @@
 Version=1.0
 Type=Application
 Name=Wallhaven Viewer
-Comment=Browse and download wallpapers
-Exec=wallhaven-viewer
-Icon=cc.wallhaven.Viewer
+Comment=Просмотр и загрузка обоев с Wallhaven.cc
+# Укажите полный путь к вашему бинарнику в папке dist
+Exec=/home/vadim/Документы/wallhaven-viewer/dist/WallhavenViewer
+# Укажите полный путь к вашей иконке
+Icon=/home/vadim/Документы/wallhaven-viewer/app-icon.png
 Terminal=false
-Categories=Utility;GTK;
+Categories=Graphics;Utility;
+Keywords=wallpaper;wallhaven;background;
+StartupNotify=true

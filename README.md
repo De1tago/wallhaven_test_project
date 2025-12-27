@@ -45,7 +45,7 @@ python3 main.py
 Скачайте готовый пакет из **GitHub Releases**:
 
 ```bash
-flatpak install --user cc.wallhaven.Viewer.flatpak
+flatpak install --user wallhaven-viewer.flatpak
 ```
 
 

@@ -38,7 +38,7 @@ Wallhaven Desktop Viewer — это лёгкое и красивое прило�
 Просто запустите основной скрипт:
 
 ```bash
-python3 wallhaven_viewer.py
+python3 main.py
 ```
 ### Flatpak
 
@@ -67,7 +67,7 @@ sudo pacman -S python python-gobject gtk4 libadwaita python-dbus python-requests
 ```bash
 git clone https://github.com/<your-username>/wallhaven-viewer.git
 cd wallhaven-viewer
-python wallhaven_viewer.py
+python main.py
 ```
 -----
 

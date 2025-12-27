@@ -47,7 +47,7 @@ modules:
       
       
       # 2. Копируем файлы кода (используем кавычки для безопасности)
-      - "install -m 644 wallhaven_viewer.py mainwindow.ui fullimage.ui style.css /app/lib/wallhaven-viewer/"
+      - "install -m 644 main.py config.py utils.py api.py image_loader.py settings_window.py full_image_window.py main_window.py app.py mainwindow.ui fullimage.ui style.css /app/lib/wallhaven-viewer/"
       
       # 3. Устанавливаем запускатор
       - "install -m 755 wallhaven-viewer-wrapper.sh /app/bin/wallhaven-viewer"

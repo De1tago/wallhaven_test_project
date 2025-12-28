@@ -1,16 +1,15 @@
 """
 Модуль окна полноразмерного просмотра обоев.
 """
-
 import os
 import threading
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf
-from utils import resolve_path
-from image_loader import ImageLoader
-from api import WallhavenAPI
 
+from wallhaven_viewer.utils import resolve_path, wallpaper_portal_available
+from wallhaven_viewer.image_loader import ImageLoader
+from wallhaven_viewer.api import WallhavenAPI
 
 class FullImageWindow(Gtk.Window):
     """
@@ -228,48 +227,39 @@ class FullImageWindow(Gtk.Window):
         except Exception as e:
             print(f"Ошибка сохранения: {e}")
 
-    def on_set_wallpaper_clicked(self, button):
-        """Устанавливает обои рабочего стола через D-Bus Portal."""
+    from wallhaven_viewer.utils import wallpaper_portal_available
+
+    def on_set_wallpaper_clicked(self, _btn):
         if not self.local_path or not os.path.exists(self.local_path):
             print("❌ Нет локального файла — нельзя установить обои")
             return
 
-        try:
-            import dbus
-            import dbus.types
-
-            bus = dbus.SessionBus()
-            obj = bus.get_object(
-                'org.freedesktop.portal.Desktop',
-                '/org/freedesktop/portal/desktop'
-            )
-            iface = dbus.Interface(
-                obj,
-                'org.freedesktop.portal.Wallpaper'
-            )
-
-            fd = os.open(self.local_path, os.O_RDONLY)
-
+        used_portal = False
+        if wallpaper_portal_available() and os.getenv("FLATPAK_ID"):
+            # пробуем портал ТОЛЬКО внутри Flatpak и если backend отвечает
             try:
-                options = {
-                    'show-preview': dbus.Boolean(False, variant_level=1)
-                }
+                import dbus, dbus.types
+                bus = dbus.SessionBus()
+                iface = dbus.Interface(
+                    bus.get_object("org.freedesktop.portal.Desktop",
+                                "/org/freedesktop/portal/desktop"),
+                    "org.freedesktop.portal.Wallpaper")
+                fd = os.open(self.local_path, os.O_RDONLY)
+                try:
+                    iface.SetWallpaperFile(
+                        "",
+                        dbus.types.UnixFd(fd),
+                        {'show-preview': dbus.Boolean(False, variant_level=1)}
+                    )
+                    print(f"✅ Обои установлены через портал: {self.local_path}")
+                    used_portal = True
+                finally:
+                    os.close(fd)
+            except Exception as e:
+                print(f"⚠️  Портал недоступен ({e}); fallback на GSettings")
 
-                iface.SetWallpaperFile(
-                    "",
-                    dbus.types.UnixFd(fd),
-                    options
-                )
-
-                print(f"✅ Установлено как обои (без деградации): {self.local_path}")
-
-            finally:
-                os.close(fd)
-
-        except dbus.DBusException as e:
-            print(f"❌ D-Bus ошибка: {e}")
-        except Exception as e:
-            print(f"❌ Неизвестная ошибка: {e}")
+        if not used_portal:
+            self._set_wallpaper_worker(self.local_path)
 
     def _set_wallpaper_worker(self, path):
         """
@@ -304,4 +294,3 @@ class FullImageWindow(Gtk.Window):
             print(f"❌ Ошибка установки обоев: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
-

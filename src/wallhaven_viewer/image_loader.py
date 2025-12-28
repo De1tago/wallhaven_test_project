@@ -8,7 +8,7 @@ import requests
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import GdkPixbuf, GLib, Gdk, Gtk
-from utils import get_cache_path, get_cache_dir
+from wallhaven_viewer.utils import get_cache_path, get_cache_dir
 
 
 class ImageLoader:

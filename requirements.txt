@@ -6,3 +6,4 @@ dbus-python
 pyinstaller
 packaging
 setuptools
+PyGObject

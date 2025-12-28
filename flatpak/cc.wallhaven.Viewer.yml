@@ -2,8 +2,7 @@ app-id: cc.wallhaven.Viewer
 runtime: org.gnome.Platform
 runtime-version: '49'
 sdk: org.gnome.Sdk
-command: wallhaven-viewer
-
+command: python3 -m wallhaven_viewer
 finish-args:
   - --share=network
   - --share=ipc
@@ -19,8 +18,6 @@ finish-args:
   - --env=DCONF_USER_CONFIG_DIR=.config/dconf
   - --talk-name=org.freedesktop.portal.Wallpaper
   - --talk-name=org.freedesktop.impl.portal.Wallpaper
-
-
 modules:
   - name: python3-requests
     buildsystem: simple
@@ -28,33 +25,33 @@ modules:
       build-args:
         - --share=network
     build-commands:
-        - pip3 install --prefix=/app requests dbus-python
+        - pip3 install --prefix=/app requests dbus-python PyGObject
     sources:
       - type: shell
         commands:
           - mkdir -p /app/lib/wallhaven-viewer
           - mkdir -p /app/bin
-
   - name: wallhaven-viewer
     buildsystem: simple
     build-commands:
-      # 1. Создаем дерево папок
+      # 1. Создаём дерево папок в /app
       - mkdir -p /app/lib/wallhaven-viewer
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
       - mkdir -p /app/share/icons/hicolor/256x256/apps
-      - mkdir -p /app/share/icons/hicolor/scalable/apps
-      
-      
-      # 2. Копируем файлы кода (используем кавычки для безопасности)
-      - "install -m 644 main.py config.py utils.py api.py image_loader.py settings_window.py full_image_window.py main_window.py app.py mainwindow.ui fullimage.ui style.css /app/lib/wallhaven-viewer/"
-      
-      # 3. Устанавливаем запускатор
-      - "install -m 755 wallhaven-viewer-wrapper.sh /app/bin/wallhaven-viewer"
-      
-      # 4. Устанавливаем Desktop-файл и Иконку
-      - "install -m 644 cc.wallhaven.Viewer.desktop /app/share/applications/cc.wallhaven.Viewer.desktop"
-      - "install -m 644 app-icon.png /app/share/icons/hicolor/256x256/apps/cc.wallhaven.Viewer.png"
+      - mkdir -p /app/share/wallhaven_viewer/{css,ui}
+      # 2. Копируем Python-пакет
+      - cp -r src/wallhaven_viewer/* /app/lib/wallhaven-viewer/
+      # 3. Копируем ресурсы (UI/CSS)
+      - install -m 644 data/ui/*.ui /app/share/wallhaven_viewer/ui/
+      - install -m 644 data/css/*.css /app/share/wallhaven_viewer/css/
+      # 4. Устанавливаем .desktop и иконку
+      - install -m 644 data/applications/cc.wallhaven.Viewer.desktop /app/share/applications/
+      - install -m 644 data/icons/hicolor/256x256/apps/cc.wallhaven.Viewer.png /app/share/icons/hicolor/256x256/apps/
+      # 5. Устанавливаем wrapper-скрипт (не нужен, т.к. command уже python3 -m)
+      # (оставьте, если хотите fallback)
+      # 6. Убедимся, что пакет исполняемый
+      - chmod +x /app/lib/wallhaven-viewer/__main__.py
     sources:
       - type: dir
         path: .

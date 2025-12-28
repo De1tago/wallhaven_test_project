@@ -3,7 +3,7 @@
 """
 
 import requests
-from config import API_URL, WALLPAPER_API_URL, RESOLUTION_OPTIONS, RATIO_OPTIONS, SORT_OPTIONS
+from wallhaven_viewer.config import API_URL, WALLPAPER_API_URL, RESOLUTION_OPTIONS, RATIO_OPTIONS, SORT_OPTIONS
 
 
 class WallhavenAPI:

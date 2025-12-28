@@ -6,8 +6,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Gdk, Gio, Adw
-from utils import resolve_path
-from main_window import MainWindow
+from wallhaven_viewer.utils import resolve_path
+from wallhaven_viewer.main_window import MainWindow
 
 
 class WallpaperViewer(Adw.Application):

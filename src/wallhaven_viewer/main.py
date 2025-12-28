@@ -11,7 +11,10 @@ Wallhaven Desktop Viewer
 """
 
 # Импортируем все необходимые классы из новых модулей для обратной совместимости
-from app import WallpaperViewer, main
+import pathlib, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from wallhaven_viewer.app import WallpaperViewer, main
+...
 
 # Экспортируем основные классы и функции для обратной совместимости
 __all__ = ['WallpaperViewer', 'main']

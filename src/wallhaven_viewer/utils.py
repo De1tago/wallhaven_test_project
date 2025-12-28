@@ -7,25 +7,44 @@ import sys
 from gi.repository import GLib
 
 
-def resolve_path(filename):
+def resolve_path(filename: str) -> str:
     """
-    Возвращает путь к файлу, учитывая особенности работы PyInstaller.
+    Ищет ресурс по следующим местам (в указанном порядке):
 
-    Args:
-        filename (str): Имя файла относительно корня проекта.
-
-    Returns:
-        str: Абсолютный путь к файлу.
+    1. dev-режим: ../data/(css|ui)/<file> или ../data/<file>
+    2. установленный Flatpak: /app/share/wallhaven_viewer/(css|ui)/<file>
+    3. рядом с текущим модулем (старое расположение)
     """
-    if getattr(sys, 'frozen', False):
-        # Если приложение запущено как скомпилированный файл
-        base_dir = sys._MEIPASS
-    else:
-        # Если приложение запущено как обычный скрипт .py
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+    import pathlib
 
-    return os.path.join(base_dir, filename)
+    here = pathlib.Path(__file__).parent
+    project_root = (here / ".." / "..").resolve()
+    dev_data = project_root / "data"
 
+    # 1. поиск в каталоге data/
+    candidates = [
+        dev_data / filename,                   # data/<file>
+        dev_data / "css" / filename,           # data/css/<file>
+        dev_data / "ui" / filename,            # data/ui/<file>
+    ]
+
+    # 2. путь внутри Flatpak
+    flatpak_base = pathlib.Path("/app/share/wallhaven_viewer")
+    candidates += [
+        flatpak_base / filename,
+        flatpak_base / "css" / filename,
+        flatpak_base / "ui" / filename,
+    ]
+
+    # 3. исторический — рядом с .py
+    candidates.append(here / filename)
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    # fallback — вернём абсолютный путь для отладки
+    return str((here / filename).resolve())
 
 def get_cache_dir():
     """
@@ -90,3 +109,21 @@ def get_cache_path(thumb_url, cache_dir=None):
     filename = thumb_url.split('/')[-1]
     return os.path.join(cache_dir, filename)
 
+import os, subprocess
+
+def wallpaper_portal_available() -> bool:
+    """True, если org.freedesktop.portal.Wallpaper реагирует."""
+    try:
+        # qdbus/dbus-send отсутствуют в некоторых системах; ловим любые ошибки
+        out = subprocess.check_output(
+            ["gdbus", "call", "--session",
+             "--dest", "org.freedesktop.portal.Desktop",
+             "--object-path", "/org/freedesktop/portal/desktop",
+             "--method", "org.freedesktop.DBus.Properties.Get",
+             "org.freedesktop.portal.Wallpaper", "version"],
+            stderr=subprocess.DEVNULL,
+            timeout=2
+        )
+        return b"(" in out  # ответ пришёл
+    except Exception:
+        return False

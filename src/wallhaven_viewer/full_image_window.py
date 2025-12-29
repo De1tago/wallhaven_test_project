@@ -237,48 +237,46 @@ class FullImageWindow(Gtk.Window):
             print("⚠️ populate_tags: tags_flowbox is None")
             return
 
-        print(f"🏷️ populate_tags: добавляем {len(tags)} тегов")
+        try:
+            # Очистка старых детей
+            while True:
+                child = self.tags_flowbox.get_first_child()
+                if child is None:
+                    break
+                self.tags_flowbox.remove(child)
 
-        # Очищаем старые теги
-        while True:
-                # Debug prints removed
-            if child is None:
-                break
-            self.tags_flowbox.remove(child)
-
-        # Добавляем новые (оборачиваем в Gtk.FlowBoxChild для совместимости)
-        for t in tags:
-            try:
-                name = t.get('name') if isinstance(t, dict) else str(t)
-                    # Debug prints removed
-                b = Gtk.Button.new_with_label(name)
-                b.add_css_class('pill')
-
-                def make_on_click(tag_name):
-                    def on_click(btn):
-                        try:
-                            if hasattr(self.parent_window, 'search_and_present'):
-                                self.parent_window.search_and_present(tag_name)
-                            else:
-                                self.parent_window.start_new_search(tag_name)
-                            self.parent_window.present()
-                        except Exception as e:
-                            print(f"Ошибка при клике по тегу: {e}")
-                    return on_click
-
-                b.connect('clicked', make_on_click(name))
-
-                # Оборачиваем кнопку в FlowBoxChild — это стабилизирует поведение
+            # Добавляем новые теги
+            for t in tags:
                 try:
-                    child = Gtk.FlowBoxChild()
-                    child.set_child(b)
-                    self.tags_flowbox.append(child)
-                except Exception:
-                    # Фоллбек: добавляем напрямую
-                    self.tags_flowbox.append(b)
-            except Exception as e:
-                print(f"Ошибка при добавлении тега: {e}")
-                continue
+                    name = t.get('name') if isinstance(t, dict) else str(t)
+                    btn = Gtk.Button.new_with_label(name)
+                    btn.add_css_class('pill')
+
+                    def make_on_click(tag_name):
+                        def on_click(_btn):
+                            try:
+                                if hasattr(self.parent_window, 'search_and_present'):
+                                    self.parent_window.search_and_present(tag_name)
+                                else:
+                                    self.parent_window.start_new_search(tag_name)
+                                self.parent_window.present()
+                            except Exception as e:
+                                print(f"Ошибка при клике по тегу: {e}")
+                        return on_click
+
+                    btn.connect('clicked', make_on_click(name))
+
+                    try:
+                        fb_child = Gtk.FlowBoxChild()
+                        fb_child.set_child(btn)
+                        self.tags_flowbox.append(fb_child)
+                    except Exception:
+                        self.tags_flowbox.append(btn)
+                except Exception as e:
+                    print(f"Ошибка при добавлении тега: {e}")
+                    continue
+        except Exception as e:
+            print(f"Ошибка в populate_tags: {e}")
 
     def update_title(self, resolution):
         """Обновляет заголовок окна с информацией о разрешении."""

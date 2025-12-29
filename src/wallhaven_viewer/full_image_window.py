@@ -33,6 +33,14 @@ class FullImageWindow(Gtk.Window):
         self.image_url = image_url
         self.download_path = download_path
         self.local_path = local_path
+        # Если локальный путь не передан, попробуем найти файл в списке скачанных у родителя
+        try:
+            if not self.local_path and hasattr(self.parent_window, 'downloaded_files'):
+                found = self.parent_window.downloaded_files.get(self.wallpaper_id)
+                if found and os.path.exists(found):
+                    self.local_path = found
+        except Exception:
+            pass
         self.image_data = None
         # Из url вида .../wallhaven-<id>.<ext> извлекаем чистый id (без префикса "wallhaven-")
         raw_name = image_url.split('/')[-1].split('.')[0]
@@ -72,7 +80,6 @@ class FullImageWindow(Gtk.Window):
 
         self.save_btn.connect("clicked", self.on_save_clicked)
         self.set_wp_btn.connect("clicked", self.on_set_wallpaper_clicked)
-
         # Метаданные и теги
         self.meta_label = builder.get_object("meta_label")
         self.meta_box = builder.get_object("meta_box")
@@ -86,7 +93,6 @@ class FullImageWindow(Gtk.Window):
                 GLib.idle_add(self.update_tag_columns)
         except Exception:
             pass
-        # Скрываем блок метаданных и тегов до отображения основного контента
         try:
             if self.meta_box:
                 self.meta_box.set_visible(False)
@@ -97,15 +103,39 @@ class FullImageWindow(Gtk.Window):
         if not self.tags_flowbox:
             print("⚠️ tags_flowbox не найден в UI")
 
+        # Если локальный файл передан — сразу загружаем его и помечаем как скачанный
         if self.local_path:
             self.load_image_and_info(local_mode=True)
-            self.set_wp_btn.set_sensitive(True)
-            self.save_btn.set_sensitive(False)
-            self.save_btn.add_css_class("suggested-action")
-            self.save_btn.set_label("Скачано")
+            try:
+                self.set_wp_btn.set_sensitive(True)
+            except Exception:
+                pass
+            try:
+                self.save_btn.set_sensitive(False)
+                pixbuf = None
+                if getattr(self, 'image_data', None):
+                    try:
+                        pixbuf = ImageLoader.load_pixbuf_from_bytes(self.image_data)
+                    except Exception:
+                        pixbuf = None
+
+                if pixbuf:
+                    resolution = ''
+                    try:
+                        if isinstance(self._meta_info, dict):
+                            resolution = self._meta_info.get('resolution', '')
+                    except Exception:
+                        resolution = ''
+
+                    GLib.idle_add(self._apply_loaded_image, pixbuf, resolution, self._meta_info, self._pending_tags)
+
+                self.save_btn.set_label("Скачано")
+            except Exception:
+                pass
         else:
             # Запускаем в потоке, так как делаем API запрос и загрузку изображения
             threading.Thread(target=self.load_image_and_info, daemon=True, args=(False,)).start()
+
         # Инициализируем контейнеры для отложенного показа мета/тегов
         self._pending_tags = []
         self._meta_info = None
@@ -116,23 +146,29 @@ class FullImageWindow(Gtk.Window):
                 self.meta_label.connect('activate-link', self.on_meta_activate_link)
         except Exception:
             pass
-
     def update_progress(self, current_bytes, total_bytes):
         """
         Обновляет прогресс-бар во время загрузки полноразмерного изображения.
-
-        Args:
-            current_bytes (int): Количество загруженных байт.
-            total_bytes (int): Общий размер файла.
+        Вызывается из фонового потока — выполняет обновление через GLib.idle_add.
         """
-        if total_bytes > 0:
-            fraction = current_bytes / total_bytes
-            percent = int(fraction * 100)
-            self.progress_bar.set_fraction(fraction)
-            self.progress_bar.set_text(f"Загрузка: {percent}%")
-            self.progress_bar.set_visible(True)
-            self.spinner.set_visible(False)
+        try:
+            if total_bytes and total_bytes > 0:
+                fraction = float(current_bytes) / float(total_bytes)
+                percent = int(fraction * 100)
+                GLib.idle_add(self._set_progress_ui, fraction, percent)
+        except Exception:
+            pass
 
+    def _set_progress_ui(self, fraction, percent):
+        try:
+            if self.progress_bar:
+                self.progress_bar.set_fraction(fraction)
+                self.progress_bar.set_text(f"Загрузка: {percent}%")
+                self.progress_bar.set_visible(True)
+            if self.spinner:
+                self.spinner.set_visible(False)
+        except Exception:
+            pass
     def load_image_and_info(self, local_mode=False):
         """Загружает полноразмерное изображение и метаданные.
 
@@ -146,7 +182,83 @@ class FullImageWindow(Gtk.Window):
             try:
                 with open(self.local_path, 'rb') as f:
                     self.image_data = f.read()
+
+                # Попробуем сначала прочитать sidecar рядом с локальным файлом
+                resolution = ""
+                try:
+                    import json
+                    sidecar = self.local_path + '.meta.json'
+                    if os.path.exists(sidecar):
+                        #print(f"✅ sidecar found for local image: {sidecar} (instance id={id(self)})")
+                        with open(sidecar, 'r', encoding='utf-8') as sf:
+                            j = json.load(sf)
+                            meta = j.get('meta')
+                            tags = j.get('tags')
+                            self._meta_info = meta
+                            self._pending_tags = tags or []
+                            resolution = meta.get('resolution', '') if isinstance(meta, dict) else ''
+                            #print(f"🔖 sidecar loaded (instance id={id(self)}): meta={'set' if self._meta_info else 'empty'}, tags_count={len(self._pending_tags)}; meta_repr={repr(self._meta_info)}")
+                    else:
+                        # Если sidecar отсутствует — делаем запрос к API и записываем sidecar
+                        #print(f"⚠️ sidecar not found for {self.local_path}, querying API")
+                        wallpaper_info = None
+                        for attempt in range(1, 4):
+                            try:
+                                wallpaper_info = WallhavenAPI.get_wallpaper_info(self.wallpaper_id)
+                                if wallpaper_info:
+                                    break
+                                else:
+                                    print(f"⚠️ wallpaper_info empty on attempt {attempt}")
+                            except Exception as e:
+                                print(f"Ошибка при запросе wallpaper_info (local_mode attempt {attempt}): {e}")
+                            if attempt < 3:
+                                time.sleep(0.6)
+
+                        resolution = wallpaper_info.get('resolution', '') if wallpaper_info else ''
+
+                        if wallpaper_info:
+                            try:
+                                file_size = wallpaper_info.get('file_size') or wallpaper_info.get('size') or 0
+                                try:
+                                    size_mb = float(file_size) / (1024 * 1024)
+                                    size_str = f"{size_mb:.2f} MB"
+                                except Exception:
+                                    size_str = str(file_size)
+
+                                uploader = wallpaper_info.get('uploaded_by') or wallpaper_info.get('uploader') or wallpaper_info.get('user') or ''
+                                views = wallpaper_info.get('views', '')
+                                favorites = wallpaper_info.get('favorites', '') or wallpaper_info.get('favourites', '')
+
+                                self._meta_info = {
+                                    'size': size_str,
+                                    'uploader': uploader,
+                                    'views': views,
+                                    'favorites': favorites,
+                                    'resolution': resolution,
+                                }
+                            except Exception:
+                                self._meta_info = None
+
+                            try:
+                                tags = wallpaper_info.get('tags', []) or []
+                                self._pending_tags = tags
+                            except Exception:
+                                self._pending_tags = []
+
+                            # Записываем sidecar рядом с файлом, чтобы в следующий раз не дергать API
+                            try:
+                                with open(sidecar, 'w', encoding='utf-8') as sf:
+                                    json.dump({'meta': self._meta_info, 'tags': self._pending_tags}, sf, ensure_ascii=False, indent=2)
+                                print(f"✅ Wrote sidecar for local image: {sidecar} (instance id={id(self)})")
+                            except Exception as e:
+                                print(f"Не удалось записать sidecar: {e}")
+                        else:
+                            self._pending_tags = []
+                except Exception as e:
+                    print(f"Ошибка при чтении/записи sidecar для локального файла: {e}")
+
                 GLib.idle_add(self.update_title, resolution)
+                #print(f"load_image_and_info finished (instance id={id(self)}), _meta_info set={'yes' if self._meta_info else 'no'}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
             except Exception as e:
                 print(f"Ошибка чтения локального файла: {e}")
                 self.image_data = None
@@ -330,9 +442,31 @@ class FullImageWindow(Gtk.Window):
         self.set_wp_btn.set_sensitive(True)
 
         # После отображения изображения показываем сохранившиеся метаданные и теги
-        print("🖼️ update_image: image shown, scheduling meta/tags display")
+        import threading as _th
+        #print(f"🖼️ update_image: image shown, scheduling meta/tags display (instance id={id(self)}, thread={_th.current_thread().name})")
+        #print(f"    current _meta_info repr: {repr(self._meta_info)}; pending_tags count: {len(self._pending_tags) if self._pending_tags else 0}")
         # Всегда показываем блок мета/тегов после отображения изображения
         GLib.idle_add(self.show_meta_and_tags)
+
+    def _apply_loaded_image(self, pixbuf, resolution, meta, tags):
+        """
+        Вызывается в main thread: устанавливает мета/теги, обновляет заголовок и отображает изображение.
+        Это гарантирует корректный порядок действий и отсутствие гонок между
+        присвоением `_meta_info/_pending_tags` и `update_image`.
+        """
+        try:
+            self._meta_info = meta
+            self._pending_tags = tags or []
+            try:
+                self.update_title(resolution)
+            except Exception:
+                pass
+            try:
+                self.update_image(pixbuf)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"Ошибка в _apply_loaded_image: {e}")
 
     def on_save_clicked(self, btn):
         """Обработчик нажатия кнопки сохранения. Сохраняет файл либо по умолчанию, либо через диалог."""
@@ -349,6 +483,11 @@ class FullImageWindow(Gtk.Window):
                 local_path = os.path.join(self.download_path, name)
                 with open(local_path, "wb") as f:
                     f.write(self.image_data)
+
+                try:
+                    self._write_sidecar(local_path)
+                except Exception:
+                    pass
 
                 self.local_path = local_path
                 self.save_btn.set_label("Скачано")
@@ -379,6 +518,12 @@ class FullImageWindow(Gtk.Window):
                 with open(local_path, "wb") as file:
                     file.write(self.image_data)
 
+                # Сохраняем сопутствующие метаданные рядом с файлом (sidecar)
+                try:
+                    self._write_sidecar(local_path)
+                except Exception:
+                    pass
+
                 self.local_path = local_path
                 self.save_btn.set_label("Скачано")
                 self.save_btn.set_sensitive(False)
@@ -389,6 +534,24 @@ class FullImageWindow(Gtk.Window):
                 self.parent_window.flowbox.invalidate_filter()
         except Exception as e:
             print(f"Ошибка сохранения: {e}")
+
+    def _write_sidecar(self, image_path):
+        """
+        Записывает sidecar JSON-файл рядом с изображением, содержащий
+        `_meta_info` и `_pending_tags`, чтобы при открытии локального файла
+        можно было восстановить метаданные без обращения к API.
+        """
+        try:
+            import json
+            meta = {
+                'meta': self._meta_info,
+                'tags': self._pending_tags,
+            }
+            sidecar_path = image_path + '.meta.json'
+            with open(sidecar_path, 'w', encoding='utf-8') as sf:
+                json.dump(meta, sf, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Не удалось записать sidecar: {e}")
 
     from wallhaven_viewer.utils import wallpaper_portal_available
 
@@ -463,7 +626,8 @@ class FullImageWindow(Gtk.Window):
         Показывает блок с метаданными и тегами после того, как основное изображение отображено.
         """
         try:
-            print(f"🔔 show_meta_and_tags: meta_info={'set' if self._meta_info else 'empty'}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
+            import threading as _th
+            #print(f"🔔 show_meta_and_tags (instance id={id(self)}, thread={_th.current_thread().name}): meta_info_repr={repr(self._meta_info)}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
             # Формируем отображение метаданных: размер, автор (кликабельно), просмотры и лайки
             if self.meta_label:
                 if self._meta_info:

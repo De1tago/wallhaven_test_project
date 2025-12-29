@@ -64,3 +64,8 @@ modules:
     sources:
       - type: dir
         path: .. # Т.к. манифест в папке flatpak/, поднимаемся выше к папке src
+
+
+# flatpak-builder --force-clean --user --install build-dir ./flatpak/cc.wallhaven.Viewer.yml
+# flatpak-builder --repo=repo --force-clean build-dir ./flatpak/cc.wallhaven.Viewer.yml
+# flatpak build-bundle repo wallhaven-viewer.flatpak cc.wallhaven.Viewer

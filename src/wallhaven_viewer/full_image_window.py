@@ -77,6 +77,15 @@ class FullImageWindow(Gtk.Window):
         self.meta_label = builder.get_object("meta_label")
         self.meta_box = builder.get_object("meta_box")
         self.tags_flowbox = builder.get_object("tags_flowbox")
+        # Обертка FlowBox — прокручиваемый контейнер, управление высотой будет динамическим
+        self.tags_scrolled = builder.get_object("tags_scrolled")
+        # Подпишемся на изменение размера контейнера тегов, чтобы пересчитывать число столбцов
+        try:
+            if self.tags_scrolled:
+                self.tags_scrolled.connect("size-allocate", lambda w, alloc: GLib.idle_add(self.update_tag_columns))
+                GLib.idle_add(self.update_tag_columns)
+        except Exception:
+            pass
         # Скрываем блок метаданных и тегов до отображения основного контента
         try:
             if self.meta_box:
@@ -275,6 +284,26 @@ class FullImageWindow(Gtk.Window):
                 except Exception as e:
                     print(f"Ошибка при добавлении тега: {e}")
                     continue
+            # Адаптивная установка высоты контейнера с тегами по количеству тегов
+            try:
+                count = len(tags) if tags is not None else 0
+                if count <= 8:
+                    h = 100
+                elif count <= 20:
+                    h = 160
+                else:
+                    h = 260
+                if hasattr(self, 'tags_scrolled') and self.tags_scrolled:
+                    # Устанавливаем рекомендуемую высоту; Gtk примет значение при отображении
+                    self.tags_scrolled.set_property('height-request', h)
+            except Exception:
+                pass
+
+            # Пересчитываем число столбцов после добавления элементов
+            try:
+                GLib.idle_add(self.update_tag_columns)
+            except Exception:
+                pass
         except Exception as e:
             print(f"Ошибка в populate_tags: {e}")
 
@@ -491,6 +520,51 @@ class FullImageWindow(Gtk.Window):
                 self.meta_box.set_visible(True)
         except Exception as e:
             print(f"Ошибка при показе мета/тегов: {e}")
+
+    def update_tag_columns(self):
+        """
+        Пересчитывает рекомендованное число столбцов (`max-children-per-line`) для
+        `tags_flowbox` на основе ширины `tags_scrolled` / окна.
+        """
+        try:
+            if not self.tags_flowbox:
+                return
+
+            # Приблизительная ширина одного «пилла» тега (можно подобрать эмпирически)
+            approx_tag_w = 120
+
+            width = 0
+            try:
+                if hasattr(self, 'tags_scrolled') and self.tags_scrolled:
+                    width = self.tags_scrolled.get_allocated_width()
+            except Exception:
+                width = 0
+
+            # fallback на ширину окна, если не удалось получить ширину скролла
+            if not width or width <= 0:
+                try:
+                    width = self.get_allocated_width()
+                except Exception:
+                    width = 800
+
+            cols = max(1, int(width // approx_tag_w))
+            cols = min(cols, 8)
+
+            # Пробуем установить через метод, если он доступен, иначе через свойство
+            try:
+                setter = getattr(self.tags_flowbox, 'set_max_children_per_line', None)
+                if callable(setter):
+                    setter(cols)
+                else:
+                    # Попытка через сеттер свойства (имя в форме GObject)
+                    try:
+                        self.tags_flowbox.set_property('max-children-per-line', cols)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     def on_meta_activate_link(self, label, uri):
         # Открываем профиль автора в системном браузере (с фолбеком на xdg-open)

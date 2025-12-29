@@ -125,46 +125,40 @@ class FullImageWindow(Gtk.Window):
             self.spinner.set_visible(False)
 
     def load_image_and_info(self, local_mode=False):
-        """
-        Загружает полноразмерное изображение (локально или по сети) и получает метаданные (разрешение).
+        """Загружает полноразмерное изображение и метаданные.
 
-        Args:
-            local_mode (bool, optional): Если True, пытается загрузить из local_path.
+        Если передан `local_mode`, пытается загрузить из `self.local_path`.
+        Иначе запрашивает метаданные у API (с ретраями) и запускает загрузку изображения по сети.
         """
         resolution = ""
-        print(f"⏱️ load_image_and_info called (local_mode={local_mode})")
 
-        # 1. Загрузка данных (API или локально)
+        # 1) Локальная загрузка
         if local_mode and self.local_path:
             try:
-                with open(self.local_path, "rb") as f:
+                with open(self.local_path, 'rb') as f:
                     self.image_data = f.read()
                 GLib.idle_add(self.update_title, resolution)
             except Exception as e:
                 print(f"Ошибка чтения локального файла: {e}")
                 self.image_data = None
         else:
-            # Запрос API для разрешения
-            try:
-                # Попытки получения информации с ретраем (до 3 попыток)
-                wallpaper_info = None
-                for attempt in range(1, 4):
-                    try:
-                        wallpaper_info = WallhavenAPI.get_wallpaper_info(self.wallpaper_id)
-                        if wallpaper_info:
-                            print(f"🔎 wallpaper_info fetched on attempt {attempt}")
-                            break
-                        else:
-                            print(f"🔎 wallpaper_info attempt {attempt} returned None")
-                    except Exception as e:
-                        print(f"🔎 wallpaper_info attempt {attempt} error: {e}")
-                    if attempt < 3:
-                        time.sleep(0.6)
+            # 2) Получаем метаданные от API с ретраем
+            wallpaper_info = None
+            for attempt in range(1, 4):
+                try:
+                    wallpaper_info = WallhavenAPI.get_wallpaper_info(self.wallpaper_id)
+                    if wallpaper_info:
+                        break
+                except Exception as e:
+                    print(f"Ошибка при запросе wallpaper_info (attempt {attempt}): {e}")
+                if attempt < 3:
+                    time.sleep(0.6)
 
-                resolution = wallpaper_info.get("resolution", "") if wallpaper_info else ""
-                # Собираем метаданные
-                if wallpaper_info and self.meta_label:
-                    # file_size может быть в байтах
+            resolution = wallpaper_info.get('resolution', '') if wallpaper_info else ''
+
+            # Собираем метаданные
+            if wallpaper_info:
+                try:
                     file_size = wallpaper_info.get('file_size') or wallpaper_info.get('size') or 0
                     try:
                         size_mb = float(file_size) / (1024 * 1024)
@@ -176,47 +170,39 @@ class FullImageWindow(Gtk.Window):
                     views = wallpaper_info.get('views', '')
                     favorites = wallpaper_info.get('favorites', '') or wallpaper_info.get('favourites', '')
 
-                    # Сохраняем структурированные метаданные для отображения после загрузки изображения
-                    try:
-                        self._meta_info = {
-                            'size': size_str,
-                            'uploader': uploader,
-                            'views': views,
-                            'favorites': favorites,
-                        }
-                    except Exception:
-                        self._meta_info = None
+                    self._meta_info = {
+                        'size': size_str,
+                        'uploader': uploader,
+                        'views': views,
+                        'favorites': favorites,
+                    }
+                except Exception:
+                    self._meta_info = None
 
                 # Теги
-                if wallpaper_info:
+                try:
                     tags = wallpaper_info.get('tags', []) or []
-                    print(f"🔎 tags fetched count: {len(tags)}")
-                    # Сохраняем теги для отображения после загрузки изображения
-                    try:
-                        self._pending_tags = tags
-                    except Exception:
-                        self._pending_tags = []
-                else:
-                    # Если инфо недоступно — оставляем пустой список
+                    self._pending_tags = tags
+                except Exception:
                     self._pending_tags = []
+            else:
+                self._pending_tags = []
 
-                if wallpaper_info and not self.tags_flowbox:
-                    print("⚠️ tags_flowbox не инициализирован, теги не могут быть отображены")
+            if wallpaper_info is None:
                 GLib.idle_add(self.update_title, resolution)
-            except Exception:
+            else:
                 GLib.idle_add(self.update_title, resolution)
 
-            # Загрузка по сети
+            # Загрузка изображения по сети
             def on_image_loaded(img_data):
                 if img_data:
-                    print("🖼️ on_image_loaded: image data received")
                     self.image_data = img_data
                     try:
                         pixbuf = ImageLoader.load_pixbuf_from_bytes(img_data)
                         if pixbuf:
                             GLib.idle_add(self.update_image, pixbuf)
                     except Exception as e:
-                        print(f"Ошибка: {e}")
+                        print(f"Ошибка при обработке изображения: {e}")
                         GLib.idle_add(lambda: self.progress_bar.set_visible(False))
                 else:
                     GLib.idle_add(lambda: self.spinner.set_visible(False))
@@ -226,8 +212,9 @@ class FullImageWindow(Gtk.Window):
                 self.image_url,
                 on_image_loaded,
                 progress_callback=self.update_progress,
-                timeout=60
+                timeout=60,
             )
+            
 
         # 2. Обновление UI для локального режима
         if local_mode and self.image_data:
@@ -254,7 +241,7 @@ class FullImageWindow(Gtk.Window):
 
         # Очищаем старые теги
         while True:
-            child = self.tags_flowbox.get_first_child()
+                # Debug prints removed
             if child is None:
                 break
             self.tags_flowbox.remove(child)
@@ -263,7 +250,7 @@ class FullImageWindow(Gtk.Window):
         for t in tags:
             try:
                 name = t.get('name') if isinstance(t, dict) else str(t)
-                # Создаём кнопку-метку для тега
+                    # Debug prints removed
                 b = Gtk.Button.new_with_label(name)
                 b.add_css_class('pill')
 
@@ -508,19 +495,14 @@ class FullImageWindow(Gtk.Window):
             print(f"Ошибка при показе мета/тегов: {e}")
 
     def on_meta_activate_link(self, label, uri):
-        """Обработчик клика по ссылке в `meta_label` (например, автор)."""
+        # Открываем профиль автора в системном браузере (с фолбеком на xdg-open)
         try:
-            # Открываем URL в браузере (ожидаем, что uri указывает на профиль пользователя)
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+            return True
+        except Exception:
             try:
-                Gio.AppInfo.launch_default_for_uri(uri, None)
+                GLib.spawn_command_line_async(f"xdg-open '{uri}'")
                 return True
-            except Exception:
-                # fallback: xdg-open
-                try:
-                    GLib.spawn_command_line_async(f"xdg-open '{uri}'")
-                    return True
-                except Exception as e:
-                    print(f"Не удалось открыть ссылку: {e}")
-        except Exception as e:
-            print(f"Ошибка при переходе по ссылке мета: {e}")
+            except Exception as e:
+                print(f"Не удалось открыть ссылку: {e}")
         return False

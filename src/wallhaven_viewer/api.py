@@ -100,10 +100,26 @@ class WallhavenAPI:
         """
         try:
             info_url = f"{WALLPAPER_API_URL}/{wallpaper_id}"
-            info_resp = requests.get(info_url, timeout=timeout)
-            info_resp.raise_for_status()
-            return info_resp.json().get("data", {})
-        except Exception:
+            resp = requests.get(info_url, timeout=timeout)
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                print(f"Wallhaven API error: {e} (status={getattr(resp, 'status_code', 'N/A')}) url={info_url}")
+                # print response text for debugging
+                try:
+                    print(f"Response text: {resp.text}")
+                except Exception:
+                    pass
+                return None
+            # Parse json
+            j = resp.json()
+            data = j.get("data") if isinstance(j, dict) else None
+            if not data:
+                print(f"Wallhaven API: no data for wallpaper {wallpaper_id}")
+                return None
+            return data
+        except Exception as e:
+            print(f"Wallhaven API request failed: {e}")
             return None
 
     @staticmethod

@@ -3,6 +3,7 @@
 """
 import os
 import threading
+import time
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf
@@ -10,6 +11,7 @@ from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf
 from wallhaven_viewer.utils import resolve_path, wallpaper_portal_available
 from wallhaven_viewer.image_loader import ImageLoader
 from wallhaven_viewer.api import WallhavenAPI
+from gi.repository import Gtk as _Gtk
 
 class FullImageWindow(Gtk.Window):
     """
@@ -32,15 +34,22 @@ class FullImageWindow(Gtk.Window):
         self.download_path = download_path
         self.local_path = local_path
         self.image_data = None
-        self.wallpaper_id = image_url.split('/')[-1].split('.')[0]
+        # Из url вида .../wallhaven-<id>.<ext> извлекаем чистый id (без префикса "wallhaven-")
+        raw_name = image_url.split('/')[-1].split('.')[0]
+        if raw_name.startswith('wallhaven-'):
+            self.wallpaper_id = raw_name[len('wallhaven-'):]
+        else:
+            self.wallpaper_id = raw_name
 
-        ui_path = resolve_path("fullimage.ui")
+        # Создаем новый экземпляр Gtk.Builder для каждого окна
         builder = Gtk.Builder.new_from_file(resolve_path("fullimage.ui"))
 
+        # Загружаем root из нового экземпляра
         content = builder.get_object("root")
         if not content:
             raise RuntimeError("root container not found in fullimage.ui")
 
+        # Устанавливаем root как дочерний элемент окна
         self.set_child(content)
 
         xml_window = builder.get_object("full_image_window")
@@ -64,6 +73,21 @@ class FullImageWindow(Gtk.Window):
         self.save_btn.connect("clicked", self.on_save_clicked)
         self.set_wp_btn.connect("clicked", self.on_set_wallpaper_clicked)
 
+        # Метаданные и теги
+        self.meta_label = builder.get_object("meta_label")
+        self.meta_box = builder.get_object("meta_box")
+        self.tags_flowbox = builder.get_object("tags_flowbox")
+        # Скрываем блок метаданных и тегов до отображения основного контента
+        try:
+            if self.meta_box:
+                self.meta_box.set_visible(False)
+        except Exception:
+            pass
+        if not self.meta_label:
+            print("⚠️ meta_label не найден в UI")
+        if not self.tags_flowbox:
+            print("⚠️ tags_flowbox не найден в UI")
+
         if self.local_path:
             self.load_image_and_info(local_mode=True)
             self.set_wp_btn.set_sensitive(True)
@@ -73,6 +97,9 @@ class FullImageWindow(Gtk.Window):
         else:
             # Запускаем в потоке, так как делаем API запрос и загрузку изображения
             threading.Thread(target=self.load_image_and_info, daemon=True, args=(False,)).start()
+        # Инициализируем контейнеры для отложенного показа мета/тегов
+        self._pending_tags = []
+        self._meta_text = None
 
     def update_progress(self, current_bytes, total_bytes):
         """
@@ -98,6 +125,7 @@ class FullImageWindow(Gtk.Window):
             local_mode (bool, optional): Если True, пытается загрузить из local_path.
         """
         resolution = ""
+        print(f"⏱️ load_image_and_info called (local_mode={local_mode})")
 
         # 1. Загрузка данных (API или локально)
         if local_mode and self.local_path:
@@ -111,8 +139,67 @@ class FullImageWindow(Gtk.Window):
         else:
             # Запрос API для разрешения
             try:
-                wallpaper_info = WallhavenAPI.get_wallpaper_info(self.wallpaper_id)
+                # Попытки получения информации с ретраем (до 3 попыток)
+                wallpaper_info = None
+                for attempt in range(1, 4):
+                    try:
+                        wallpaper_info = WallhavenAPI.get_wallpaper_info(self.wallpaper_id)
+                        if wallpaper_info:
+                            print(f"🔎 wallpaper_info fetched on attempt {attempt}")
+                            break
+                        else:
+                            print(f"🔎 wallpaper_info attempt {attempt} returned None")
+                    except Exception as e:
+                        print(f"🔎 wallpaper_info attempt {attempt} error: {e}")
+                    if attempt < 3:
+                        time.sleep(0.6)
+
                 resolution = wallpaper_info.get("resolution", "") if wallpaper_info else ""
+                # Собираем метаданные
+                if wallpaper_info and self.meta_label:
+                    # file_size может быть в байтах
+                    file_size = wallpaper_info.get('file_size') or wallpaper_info.get('size') or 0
+                    try:
+                        size_mb = float(file_size) / (1024 * 1024)
+                        size_str = f"{size_mb:.2f} MB"
+                    except Exception:
+                        size_str = str(file_size)
+
+                    uploader = wallpaper_info.get('uploaded_by') or wallpaper_info.get('uploader') or wallpaper_info.get('user') or ''
+                    views = wallpaper_info.get('views', '')
+                    favorites = wallpaper_info.get('favorites', '') or wallpaper_info.get('favourites', '')
+
+                    meta_text = []
+                    if size_str:
+                        meta_text.append(f"Размер: {size_str}")
+                    if uploader:
+                        meta_text.append(f"Uploader: {uploader}")
+                    if views is not None:
+                        meta_text.append(f"Просмотры: {views}")
+                    if favorites is not None:
+                        meta_text.append(f"Лайки: {favorites}")
+
+                    # Сохраняем метаданные для отображения после загрузки изображения
+                    try:
+                        self._meta_text = " | ".join(meta_text)
+                    except Exception:
+                        self._meta_text = None
+
+                # Теги
+                if wallpaper_info:
+                    tags = wallpaper_info.get('tags', []) or []
+                    print(f"🔎 tags fetched count: {len(tags)}")
+                    # Сохраняем теги для отображения после загрузки изображения
+                    try:
+                        self._pending_tags = tags
+                    except Exception:
+                        self._pending_tags = []
+                else:
+                    # Если инфо недоступно — оставляем пустой список
+                    self._pending_tags = []
+
+                if wallpaper_info and not self.tags_flowbox:
+                    print("⚠️ tags_flowbox не инициализирован, теги не могут быть отображены")
                 GLib.idle_add(self.update_title, resolution)
             except Exception:
                 GLib.idle_add(self.update_title, resolution)
@@ -120,6 +207,7 @@ class FullImageWindow(Gtk.Window):
             # Загрузка по сети
             def on_image_loaded(img_data):
                 if img_data:
+                    print("🖼️ on_image_loaded: image data received")
                     self.image_data = img_data
                     try:
                         pixbuf = ImageLoader.load_pixbuf_from_bytes(img_data)
@@ -149,6 +237,60 @@ class FullImageWindow(Gtk.Window):
                 print(f"Ошибка: {e}")
                 GLib.idle_add(lambda: self.progress_bar.set_visible(False))
 
+    def populate_tags(self, tags):
+        """
+        Заполняет FlowBox с тегами.
+
+        Args:
+            tags (list): Список тегов (словари или строки).
+        """
+        if not self.tags_flowbox:
+            print("⚠️ populate_tags: tags_flowbox is None")
+            return
+
+        print(f"🏷️ populate_tags: добавляем {len(tags)} тегов")
+
+        # Очищаем старые теги
+        while True:
+            child = self.tags_flowbox.get_first_child()
+            if child is None:
+                break
+            self.tags_flowbox.remove(child)
+
+        # Добавляем новые (оборачиваем в Gtk.FlowBoxChild для совместимости)
+        for t in tags:
+            try:
+                name = t.get('name') if isinstance(t, dict) else str(t)
+                # Создаём кнопку-метку для тега
+                b = Gtk.Button.new_with_label(name)
+                b.add_css_class('pill')
+
+                def make_on_click(tag_name):
+                    def on_click(btn):
+                        try:
+                            if hasattr(self.parent_window, 'search_and_present'):
+                                self.parent_window.search_and_present(tag_name)
+                            else:
+                                self.parent_window.start_new_search(tag_name)
+                            self.parent_window.present()
+                        except Exception as e:
+                            print(f"Ошибка при клике по тегу: {e}")
+                    return on_click
+
+                b.connect('clicked', make_on_click(name))
+
+                # Оборачиваем кнопку в FlowBoxChild — это стабилизирует поведение
+                try:
+                    child = Gtk.FlowBoxChild()
+                    child.set_child(b)
+                    self.tags_flowbox.append(child)
+                except Exception:
+                    # Фоллбек: добавляем напрямую
+                    self.tags_flowbox.append(b)
+            except Exception as e:
+                print(f"Ошибка при добавлении тега: {e}")
+                continue
+
     def update_title(self, resolution):
         """Обновляет заголовок окна с информацией о разрешении."""
         res_str = f" ({resolution})" if resolution else ""
@@ -170,6 +312,11 @@ class FullImageWindow(Gtk.Window):
         if not self.local_path:
             self.save_btn.set_sensitive(True)
         self.set_wp_btn.set_sensitive(True)
+
+        # После отображения изображения показываем сохранившиеся метаданные и теги
+        print("🖼️ update_image: image shown, scheduling meta/tags display")
+        # Всегда показываем блок мета/тегов после отображения изображения
+        GLib.idle_add(self.show_meta_and_tags)
 
     def on_save_clicked(self, btn):
         """Обработчик нажатия кнопки сохранения. Сохраняет файл либо по умолчанию, либо через диалог."""
@@ -294,3 +441,41 @@ class FullImageWindow(Gtk.Window):
             print(f"❌ Ошибка установки обоев: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
+
+    def show_meta_and_tags(self):
+        """
+        Показывает блок с метаданными и тегами после того, как основное изображение отображено.
+        """
+        try:
+            print(f"🔔 show_meta_and_tags: meta_text={'set' if self._meta_text else 'empty'}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
+            if self._meta_text and self.meta_label:
+                self.meta_label.set_text(self._meta_text)
+            else:
+                # Показываем понятное сообщение, если метаданные недоступны
+                if self.meta_label:
+                    self.meta_label.set_text("Информация недоступна")
+            # Заполняем теги; если их нет — показываем плейсхолдер
+            try:
+                if self._pending_tags:
+                    self.populate_tags(self._pending_tags)
+                else:
+                    # Очищаем flowbox и добавляем метку "Теги отсутствуют"
+                    try:
+                        # Очистка через существующую логику
+                        self.populate_tags([])
+                    except Exception:
+                        pass
+                    placeholder = Gtk.Label(label="Теги отсутствуют")
+                    placeholder.add_css_class('dim-label')
+                    try:
+                        fb_child = Gtk.FlowBoxChild()
+                        fb_child.set_child(placeholder)
+                        self.tags_flowbox.append(fb_child)
+                    except Exception:
+                        self.tags_flowbox.append(placeholder)
+            except Exception as e:
+                print(f"Ошибка при populate_tags после загрузки: {e}")
+            if self.meta_box:
+                self.meta_box.set_visible(True)
+        except Exception as e:
+            print(f"Ошибка при показе мета/тегов: {e}")

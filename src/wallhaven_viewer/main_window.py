@@ -9,7 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf, Adw
-from wallhaven_viewer.utils import resolve_path, get_cache_path, extract_wallpaper_id
+from wallhaven_viewer.utils import resolve_path, get_cache_path, extract_wallpaper_id, clean_cache
 from wallhaven_viewer.config import load_settings, save_settings, RESOLUTION_OPTIONS, RATIO_OPTIONS, SORT_OPTIONS
 from wallhaven_viewer.api import WallhavenAPI
 from wallhaven_viewer.image_loader import ImageLoader
@@ -138,8 +138,25 @@ class MainWindow(Adw.ApplicationWindow):
         self.flowbox.set_max_children_per_line(cols)
 
         # --- ЗАПУСК ---
+        # Асинхронный запуск очистки кэша (файлы старше 7 дней)
+        try:
+            import threading
+            threading.Thread(target=lambda: clean_cache(7, 300), daemon=True).start()
+        except Exception:
+            pass
+
         self.scan_downloaded_wallpapers()
         self.start_new_search(self.current_query)
+
+    def search_and_present(self, query):
+        """Внешний вызов поиска — устанавливает текст в строке поиска и запускает поиск."""
+        try:
+            self.entry.set_text(query)
+            self.entry.grab_focus()
+            self.start_new_search(query)
+            self.present()
+        except Exception as e:
+            print(f"Ошибка при запуске поиска по тегу: {e}")
 
     def setup_menu_actions(self):
         """Создает меню и привязывает действия (Actions)."""
@@ -477,8 +494,39 @@ class MainWindow(Adw.ApplicationWindow):
         """Открывает окно полноразмерного изображения."""
         if hasattr(widget, 'wallhaven_local_path') and widget.wallhaven_local_path:
             local_path = widget.wallhaven_local_path
-        win = FullImageWindow(self, url, self.settings.get('download_path', ''), local_path)
-        win.present()
+
+        # Проверяем, существует ли уже окно FullImageWindow
+        if hasattr(self, '_full_image_window') and self._full_image_window:
+            try:
+                self._full_image_window.present()
+                return
+            except Exception:
+                # Старое окно возможно было уничтожено/искажено — обнуляем ссылку и создаём новое
+                try:
+                    self._full_image_window = None
+                except Exception:
+                    pass
+
+        # Создаём новое окно и сохраняем ссылку на него
+        self._full_image_window = FullImageWindow(self, url, self.settings.get('download_path', ''), local_path)
+        # Сбрасываем ссылку при уничтожении
+        self._full_image_window.connect("destroy", lambda _: setattr(self, '_full_image_window', None))
+
+        # Обрабатываем закрытие окна (close-request) — гарантируем корректное очищение ссылки
+        def _on_full_close(window, *args):
+            try:
+                setattr(self, '_full_image_window', None)
+            except Exception:
+                pass
+            return False
+
+        try:
+            self._full_image_window.connect('close-request', _on_full_close)
+        except Exception:
+            # Если сигнал недоступен, продолжаем — destroy обработчик уже установлен
+            pass
+
+        self._full_image_window.present()
 
     def on_search_clicked(self, widget):
         """Обработчик нажатия кнопки поиска или Enter в поле ввода."""

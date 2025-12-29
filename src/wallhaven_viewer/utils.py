@@ -109,6 +109,70 @@ def get_cache_path(thumb_url, cache_dir=None):
     filename = thumb_url.split('/')[-1]
     return os.path.join(cache_dir, filename)
 
+
+def clean_cache(max_age_days=7, max_total_mb=300):
+    """
+    Очищает кэш:
+      1) удаляет файлы старше `max_age_days`,
+      2) если суммарный размер кэша превышает `max_total_mb`, удаляет старые файлы до укладки под лимит.
+
+    Args:
+        max_age_days (int): время жизни файлов в днях.
+        max_total_mb (int|None): лимит кэша в мегабайтах; None — не применять ограничение.
+    """
+    try:
+        cache_dir = get_cache_dir()
+        if not cache_dir:
+            return
+
+        import time
+        now = time.time()
+        max_age = max_age_days * 24 * 60 * 60
+        max_total_bytes = (max_total_mb * 1024 * 1024) if max_total_mb else None
+
+        files = []
+        for name in os.listdir(cache_dir):
+            path = os.path.join(cache_dir, name)
+            try:
+                if not os.path.isfile(path):
+                    continue
+                st = os.stat(path)
+                files.append({
+                    'path': path,
+                    'mtime': st.st_mtime,
+                    'size': st.st_size,
+                    'removed': False
+                })
+            except Exception:
+                continue
+
+        # 1) удалить по возрасту
+        for f in files:
+            try:
+                if now - f['mtime'] > max_age:
+                    os.remove(f['path'])
+                    f['removed'] = True
+            except Exception:
+                continue
+
+        # 2) проверить суммарный размер и удалить старые файлы, если нужно
+        remaining = [f for f in files if not f['removed']]
+        total = sum(f['size'] for f in remaining)
+
+        if max_total_bytes and total > max_total_bytes:
+            # сортируем по времени изменения — старые первыми
+            remaining.sort(key=lambda x: x['mtime'])
+            for f in remaining:
+                try:
+                    os.remove(f['path'])
+                    total -= f['size']
+                    if total <= max_total_bytes:
+                        break
+                except Exception:
+                    continue
+    except Exception:
+        return
+
 import os, subprocess
 
 def wallpaper_portal_available() -> bool:

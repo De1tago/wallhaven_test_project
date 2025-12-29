@@ -3,9 +3,9 @@ Version=1.0
 Type=Application
 Name=Wallhaven Viewer
 Comment=Просмотр и загрузка обоев с Wallhaven.cc
-# Укажите полный путь к вашему бинарнику в папке dist
+# Имя совпадает с тем, что мы прописали в поле command манифеста и в /app/bin/
 Exec=wallhaven-viewer
-# Укажите полный путь к вашей иконке
+# Имя совпадает с именем файла иконки (без .png)
 Icon=cc.wallhaven.Viewer
 Terminal=false
 Categories=Graphics;Utility;

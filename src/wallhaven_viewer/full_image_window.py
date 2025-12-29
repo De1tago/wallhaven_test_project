@@ -99,7 +99,14 @@ class FullImageWindow(Gtk.Window):
             threading.Thread(target=self.load_image_and_info, daemon=True, args=(False,)).start()
         # Инициализируем контейнеры для отложенного показа мета/тегов
         self._pending_tags = []
-        self._meta_text = None
+        self._meta_info = None
+        # Поддерживаем кликабельные ссылки в мета-лейбле (для автора)
+        try:
+            if self.meta_label:
+                self.meta_label.set_use_markup(True)
+                self.meta_label.connect('activate-link', self.on_meta_activate_link)
+        except Exception:
+            pass
 
     def update_progress(self, current_bytes, total_bytes):
         """
@@ -169,21 +176,16 @@ class FullImageWindow(Gtk.Window):
                     views = wallpaper_info.get('views', '')
                     favorites = wallpaper_info.get('favorites', '') or wallpaper_info.get('favourites', '')
 
-                    meta_text = []
-                    if size_str:
-                        meta_text.append(f"Размер: {size_str}")
-                    if uploader:
-                        meta_text.append(f"Uploader: {uploader}")
-                    if views is not None:
-                        meta_text.append(f"Просмотры: {views}")
-                    if favorites is not None:
-                        meta_text.append(f"Лайки: {favorites}")
-
-                    # Сохраняем метаданные для отображения после загрузки изображения
+                    # Сохраняем структурированные метаданные для отображения после загрузки изображения
                     try:
-                        self._meta_text = " | ".join(meta_text)
+                        self._meta_info = {
+                            'size': size_str,
+                            'uploader': uploader,
+                            'views': views,
+                            'favorites': favorites,
+                        }
                     except Exception:
-                        self._meta_text = None
+                        self._meta_info = None
 
                 # Теги
                 if wallpaper_info:
@@ -447,12 +449,37 @@ class FullImageWindow(Gtk.Window):
         Показывает блок с метаданными и тегами после того, как основное изображение отображено.
         """
         try:
-            print(f"🔔 show_meta_and_tags: meta_text={'set' if self._meta_text else 'empty'}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
-            if self._meta_text and self.meta_label:
-                self.meta_label.set_text(self._meta_text)
-            else:
-                # Показываем понятное сообщение, если метаданные недоступны
-                if self.meta_label:
+            print(f"🔔 show_meta_and_tags: meta_info={'set' if self._meta_info else 'empty'}, tags_count={len(self._pending_tags) if self._pending_tags else 0}")
+            # Формируем отображение метаданных: размер, автор (кликабельно), просмотры и лайки
+            if self.meta_label:
+                if self._meta_info:
+                    size = self._meta_info.get('size') or ''
+                    uploader = self._meta_info.get('uploader') or ''
+                    views = self._meta_info.get('views') or ''
+                    favorites = self._meta_info.get('favorites') or ''
+                    # Если uploader — словарь, попробуем извлечь имя
+                    if isinstance(uploader, dict):
+                        uploader = uploader.get('username') or uploader.get('name') or str(uploader)
+                    # Экранируем текст для безопасной вставки в markup
+                    esc = GLib.markup_escape_text
+                    parts = []
+                    if size:
+                        parts.append(f"Размер: {esc(size)}")
+                    if uploader:
+                        parts.append(f"Автор: <a href='https://wallhaven.cc/user/{esc(uploader)}'>{esc(uploader)}</a>")
+                    if views != '':
+                        parts.append(f"Просмотры: {esc(str(views))}")
+                    if favorites != '':
+                        parts.append(f"Лайки: {esc(str(favorites))}")
+                    markup = " | ".join(parts) if parts else "Информация недоступна"
+                    try:
+                        self.meta_label.set_markup(markup)
+                    except Exception:
+                        try:
+                            self.meta_label.set_text(markup)
+                        except Exception:
+                            self.meta_label.set_text("Информация недоступна")
+                else:
                     self.meta_label.set_text("Информация недоступна")
             # Заполняем теги; если их нет — показываем плейсхолдер
             try:
@@ -479,3 +506,21 @@ class FullImageWindow(Gtk.Window):
                 self.meta_box.set_visible(True)
         except Exception as e:
             print(f"Ошибка при показе мета/тегов: {e}")
+
+    def on_meta_activate_link(self, label, uri):
+        """Обработчик клика по ссылке в `meta_label` (например, автор)."""
+        try:
+            # Открываем URL в браузере (ожидаем, что uri указывает на профиль пользователя)
+            try:
+                Gio.AppInfo.launch_default_for_uri(uri, None)
+                return True
+            except Exception:
+                # fallback: xdg-open
+                try:
+                    GLib.spawn_command_line_async(f"xdg-open '{uri}'")
+                    return True
+                except Exception as e:
+                    print(f"Не удалось открыть ссылку: {e}")
+        except Exception as e:
+            print(f"Ошибка при переходе по ссылке мета: {e}")
+        return False

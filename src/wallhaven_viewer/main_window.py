@@ -331,11 +331,11 @@ class MainWindow(Adw.ApplicationWindow):
             transient_for=self,
             application_name="Wallhaven Viewer",
             application_icon="cc.wallhaven.Viewer",
-            developer_name="OOOTMYV_DENEG",
-            version="1.0",
+            developer_name="De1tago",
+            version="0.0.2",
             comments="Просмотр и скачивание обоев с Wallhaven.cc",
             website="https://wallhaven.cc",
-            copyright="© 2025 Vadim",
+            copyright="© 2025 De1tago",
             license_type=Gtk.License.MIT_X11,
         )
         about.present()

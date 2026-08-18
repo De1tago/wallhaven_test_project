@@ -1,10 +1,27 @@
 """
 Модуль констант и настроек приложения Wallhaven Viewer.
+
+Ядро не зависит от GTK/Qt: путь к конфигурации строится по спецификации
+XDG Base Directory, а не через GLib.
 """
 
 import os
 import configparser
-from gi.repository import GLib
+
+
+def get_config_dir():
+    """
+    Возвращает директорию настроек ~/.config/wallhaven-viewer.
+
+    Уважает переменную XDG_CONFIG_HOME (в том числе внутри Flatpak).
+    """
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
+        os.path.expanduser("~"), ".config"
+    )
+    config_dir = os.path.join(base, "wallhaven-viewer")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
+    return config_dir
 
 # API константы
 API_URL = "https://wallhaven.cc/api/v1/search"
@@ -57,10 +74,7 @@ DEFAULT_SETTINGS = {
 
 def get_config_path():
     """Возвращает путь к config.ini в папке ~/.config пользователя."""
-    config_dir = os.path.join(GLib.get_user_config_dir(), "wallhaven-viewer")
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir, exist_ok=True)
-    return os.path.join(config_dir, "config.ini")
+    return os.path.join(get_config_dir(), "config.ini")
 
 
 def load_settings():

@@ -1,25 +1,32 @@
 """
 Утилиты для работы с путями, кэшем и файловой системой.
+
+Ядро не зависит от GTK/Qt: пути строятся по спецификации XDG Base Directory.
 """
 
 import hashlib
 import os
 import sys
-from gi.repository import GLib
 
 
 def resolve_path(filename: str) -> str:
     """
     Ищет ресурс по следующим местам (в указанном порядке):
 
-    1. dev-режим: ../data/(css|ui)/<file> или ../data/<file>
+    1. dev-режим: <корень проекта>/data/(css|ui)/<file>
     2. установленный Flatpak: /app/share/wallhaven_viewer/(css|ui)/<file>
     3. рядом с текущим модулем (старое расположение)
     """
     import pathlib
 
     here = pathlib.Path(__file__).parent
-    project_root = (here / ".." / "..").resolve()
+
+    # Ищем каталог проекта вверх от текущего модуля (корень — тот, где есть data/)
+    project_root = here
+    for _ in range(6):
+        project_root = project_root.parent
+        if (project_root / "data").is_dir():
+            break
     dev_data = project_root / "data"
 
     # 1. поиск в каталоге data/
@@ -66,7 +73,10 @@ def get_cache_dir():
     Returns:
         str or None: Абсолютный путь к папке кэша или None в случае ошибки.
     """
-    cache_dir = os.path.join(GLib.get_user_cache_dir(), "wallhaven_viewer_cache")
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(
+        os.path.expanduser("~"), ".cache"
+    )
+    cache_dir = os.path.join(base, "wallhaven_viewer_cache")
     if not os.path.exists(cache_dir):
         try:
             os.makedirs(cache_dir)
@@ -121,14 +131,16 @@ def get_gnome_backgrounds_dir():
     Возвращает директорию обоев GNOME (~/.local/share/backgrounds).
     Обои, скопированные сюда, отображаются в меню «Параметры → Внешний вид → Обои».
 
-    В Flatpak GLib.get_user_data_dir() указывает на песочницу приложения,
+    В Flatpak переменная XDG_DATA_HOME указывает на песочницу приложения,
     а не на реальный ~/.local/share, поэтому для Flatpak используем явный путь.
     """
     if os.environ.get("FLATPAK_ID"):
         # В Flatpak пишем в реальный каталог пользователя (доступ есть при --filesystem=home)
         base = os.path.join(os.path.expanduser("~"), ".local", "share")
     else:
-        base = GLib.get_user_data_dir()
+        base = os.environ.get("XDG_DATA_HOME") or os.path.join(
+            os.path.expanduser("~"), ".local", "share"
+        )
     if not base:
         return None
     bg_dir = os.path.join(base, "backgrounds")
@@ -250,22 +262,3 @@ def clean_cache(max_age_days=7, max_total_mb=300):
                     continue
     except Exception:
         return
-
-import os, subprocess
-
-def wallpaper_portal_available() -> bool:
-    """True, если org.freedesktop.portal.Wallpaper реагирует."""
-    try:
-        # qdbus/dbus-send отсутствуют в некоторых системах; ловим любые ошибки
-        out = subprocess.check_output(
-            ["gdbus", "call", "--session",
-             "--dest", "org.freedesktop.portal.Desktop",
-             "--object-path", "/org/freedesktop/portal/desktop",
-             "--method", "org.freedesktop.DBus.Properties.Get",
-             "org.freedesktop.portal.Wallpaper", "version"],
-            stderr=subprocess.DEVNULL,
-            timeout=2
-        )
-        return b"(" in out  # ответ пришёл
-    except Exception:
-        return False

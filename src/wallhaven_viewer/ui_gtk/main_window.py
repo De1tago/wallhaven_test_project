@@ -10,12 +10,12 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf, Adw
-from wallhaven_viewer.utils import resolve_path, get_cache_path, extract_wallpaper_id, clean_cache
-from wallhaven_viewer.config import load_settings, save_settings, RESOLUTION_OPTIONS, RATIO_OPTIONS, SORT_OPTIONS
-from wallhaven_viewer.api import WallhavenAPI
-from wallhaven_viewer.image_loader import ImageLoader
-from wallhaven_viewer.settings_window import SettingsWindow
-from wallhaven_viewer.full_image_window import FullImageWindow
+from wallhaven_viewer.core.cache import resolve_path, get_cache_path, extract_wallpaper_id, clean_cache
+from wallhaven_viewer.core.config import load_settings, save_settings, RESOLUTION_OPTIONS, RATIO_OPTIONS, SORT_OPTIONS
+from wallhaven_viewer.core.api import WallhavenAPI
+from wallhaven_viewer.ui_gtk.image_loader import ImageLoader
+from wallhaven_viewer.ui_gtk.settings_window import SettingsWindow
+from wallhaven_viewer.ui_gtk.full_image_window import FullImageWindow
 
 
 class MainWindow(Adw.ApplicationWindow):

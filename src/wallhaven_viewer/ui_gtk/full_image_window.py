@@ -9,9 +9,10 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, Gio, GLib, GdkPixbuf
 
-from wallhaven_viewer.utils import resolve_path, get_gnome_backgrounds_dir, get_sidecar_path_for_image, wallpaper_portal_available
-from wallhaven_viewer.image_loader import ImageLoader
-from wallhaven_viewer.api import WallhavenAPI
+from wallhaven_viewer.core.cache import resolve_path, get_gnome_backgrounds_dir, get_sidecar_path_for_image
+from wallhaven_viewer.core.api import WallhavenAPI
+from wallhaven_viewer.core.wallpaper_setter import set_desktop_wallpaper
+from wallhaven_viewer.ui_gtk.image_loader import ImageLoader
 from gi.repository import Gtk as _Gtk
 
 class FullImageWindow(Gtk.Window):
@@ -591,69 +592,19 @@ class FullImageWindow(Gtk.Window):
         except Exception as e:
             self.show_error(f"Ошибка копирования в меню обоев GNOME: {e}")
 
-    from wallhaven_viewer.utils import wallpaper_portal_available
-
     def on_set_wallpaper_clicked(self, _btn):
         if not self.local_path or not os.path.exists(self.local_path):
             self.show_error("Нет локального файла — нельзя установить обои")
             return
 
-        used_portal = False
-        if wallpaper_portal_available() and os.getenv("FLATPAK_ID"):
-            # пробуем портал ТОЛЬКО внутри Flatpak и если backend отвечает
-            try:
-                import dbus, dbus.types
-                bus = dbus.SessionBus()
-                iface = dbus.Interface(
-                    bus.get_object("org.freedesktop.portal.Desktop",
-                                "/org/freedesktop/portal/desktop"),
-                    "org.freedesktop.portal.Wallpaper")
-                fd = os.open(self.local_path, os.O_RDONLY)
-                try:
-                    iface.SetWallpaperFile(
-                        "",
-                        dbus.types.UnixFd(fd),
-                        {'show-preview': dbus.Boolean(False, variant_level=1)}
-                    )
-                    print(f"✅ Обои установлены через портал: {self.local_path}")
-                    used_portal = True
-                finally:
-                    os.close(fd)
-            except Exception as e:
-                print(f"⚠️  Портал недоступен ({e}); fallback на GSettings")
-
-        if not used_portal:
-            self._set_wallpaper_worker(self.local_path)
-
-    def _set_wallpaper_worker(self, path):
-        """
-        Устанавливает обои через GSettings.
-        Безопасно проверяет доступность ключей.
-        """
         try:
-            # Преобразуем путь в file:// URI (экранируем пробелы и спецсимволы)
-            file_uri = Gio.File.new_for_path(os.path.abspath(path)).get_uri()
-
-            # Создаём Settings
-            settings = Gio.Settings.new('org.gnome.desktop.background')
-
-            # Проверяем схему
-            schema_source = Gio.SettingsSchemaSource.get_default()
-            schema = schema_source.lookup('org.gnome.desktop.background', True)
-
-            if not schema:
-                self.show_error("Схема org.gnome.desktop.background не найдена")
-                return
-
-            # Устанавливаем обои
-            if schema.has_key('picture-uri-dark'):
-                settings.set_string('picture-uri', file_uri)
-                settings.set_string('picture-uri-dark', file_uri)
-                print(f"✅ Обои установлены (с поддержкой тёмного режима): {file_uri}")
+            if set_desktop_wallpaper(self.local_path):
+                print(f"✅ Обои установлены: {self.local_path}")
             else:
-                settings.set_string('picture-uri', file_uri)
-                print(f"✅ Обои установлены: {file_uri}")
-
+                self.show_error(
+                    "Не удалось установить обои. Убедитесь, что доступен "
+                    "xdg-desktop-portal или поддерживаемое окружение."
+                )
         except Exception as e:
             self.show_error(f"Ошибка установки обоев: {e}")
             import traceback
@@ -680,8 +631,9 @@ class FullImageWindow(Gtk.Window):
                     esc = GLib.markup_escape_text
                     parts = []
                     if size:
-                        parts.append(f"Размер: {esc(size)}")
+                        parts.append(f"Размер: {esc(str(size))}")
                     if uploader:
+                        uploader = str(uploader)
                         parts.append(f"Автор: <a href='https://wallhaven.cc/user/{esc(uploader)}'>{esc(uploader)}</a>")
                     if views != '':
                         parts.append(f"Просмотры: {esc(str(views))}")

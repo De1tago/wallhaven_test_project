@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 """
 Wallhaven Desktop Viewer
-========================
+=======================
 
 Настольное приложение для просмотра и скачивания обоев с wallhaven.cc.
-Использует GTK 4 (PyGObject) для интерфейса и Requests для работы с API.
+Интерфейсы: GTK4/Libadwaita (GNOME) и Qt6/PySide6 (Windows, KDE Plasma).
 
-Этот файл является обёрткой для обратной совместимости.
-Вся функциональность перенесена в модульную структуру.
+Этот файл является обёрткой для обратной совместимости: просто делегирует
+управление умной точке входа (__main__.py), которая сама выбирает интерфейс.
 """
 
-# Импортируем все необходимые классы из новых модулей для обратной совместимости
-import pathlib, sys
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from wallhaven_viewer.app import WallpaperViewer, main
-...
+import pathlib
+import sys
 
-# Экспортируем основные классы и функции для обратной совместимости
-__all__ = ['WallpaperViewer', 'main']
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from wallhaven_viewer.__main__ import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

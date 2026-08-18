@@ -3,9 +3,14 @@
 <img width="256" height="256" alt="cc wallhaven Viewer" src="https://github.com/user-attachments/assets/f0a354e0-a335-4ce4-95b1-7f5cf115c489" />
 </div>
 
-**Современный и производительный просмотрщик обоев для рабочего стола на Python и GTK4.**
+**Современный и производительный просмотрщик обоев для рабочего стола на Python, GTK4 и Qt6.**
 
 Wallhaven Desktop Viewer — это лёгкое и красивое приложение, позволяющее искать, просматривать и скачивать высококачественные обои с [wallhaven.cc](https://wallhaven.cc) напрямую, без необходимости открывать браузер.
+
+Интерфейс построен по паттерну **Core + Pluggable Frontends**: общее ядро (`core/`) не зависит от тулкита, а два сменных интерфейса (`ui_gtk/` и `ui_qt/`) выбираются автоматически:
+
+- **GTK4 + Libadwaita** — нативно для GNOME и большинства Linux-окружений;
+- **Qt6 / PySide6 (QML)** — нативно для Windows и KDE Plasma.
 
 ---
 
@@ -14,9 +19,27 @@ Wallhaven Desktop Viewer — это лёгкое и красивое прило�
 - 🔍 Поиск обоев через Wallhaven API
 - 🗂 Фильтрация по категориям, соотношению сторон и разрешению
 - 📥 Скачивание обоев локально
-- 🎨 Установка обоев через xdg-desktop-portal
+- 🎨 Установка обоев через xdg-desktop-portal / GSettings / D-Bus (кросс-платформенно)
 - ✅ Корректная работа в Flatpak и Wayland
+- 🖥 Оба интерфейса: Libadwaita (GNOME) и Qt Quick (Windows/KDE)
+
 ---
+
+## 💻 Выбор интерфейса
+
+При запуске приложение само определяет окружение:
+
+```bash
+# GNOME и прочие Linux — GTK (Libadwaita)
+python3 -m wallhaven_viewer
+
+# Windows и KDE Plasma — Qt (QML)
+python3 -m wallhaven_viewer
+
+# Принудительный выбор
+python3 -m wallhaven_viewer --ui gtk
+python3 -m wallhaven_viewer --ui qt
+```
 
 ## 💻 Установка
 
@@ -36,12 +59,20 @@ Wallhaven Desktop Viewer — это лёгкое и красивое прило�
 
 *(**Примечание:** Для работы с PyGObject в некоторых окружениях может потребоваться `pip install pygobject`)*
 
+#### Qt-интерфейс (Windows / KDE Plasma)
+
+```bash
+pip install PySide6 requests dbus-python
+```
+
 #### 2\. Запуск приложения
 
 Просто запустите основной скрипт:
 
 ```bash
 python3 main.py
+# или
+python3 -m wallhaven_viewer
 ```
 ### Flatpak
 
@@ -49,6 +80,17 @@ python3 main.py
 
 ```bash
 flatpak install --user cc.wallhaven.Viewer.flatpak
+```
+
+### Windows (сборка бинарника)
+
+Qt-интерфейс не требует GTK/Libadwaita, поэтому для Windows достаточно PySide6 и общего ядра. Сборка через PyInstaller:
+
+```bash
+pip install PySide6 requests dbus-python pyinstaller
+pyinstaller --noconsole --onefile --name wallhaven-viewer ^
+    --add-data "src/wallhaven_viewer/ui_qt/qml;ui_qt/qml" ^
+    src/wallhaven_viewer/__main__.py
 ```
 
 
@@ -125,10 +167,20 @@ python main.py
 # 🛠️ Архитектура и технологии
 
 **Python 3** — основной язык
-**GTK 4** — графический интерфейс (через PyGObject)
+**GTK 4 / Libadwaita** — интерфейс для GNOME (через PyGObject)
+**Qt 6 / QML** — интерфейс для Windows и KDE Plasma (через PySide6)
 **requests** — HTTP-запросы к Wallhaven API
 **threading** — фоновая загрузка миниатюр и изображений
 **caching** — локальное кэширование для производительности
+
+```
+src/wallhaven_viewer/
+├── core/        # Общая логика (0% кода UI): API, настройки, кэш, модели, установка обоев
+├── ui_gtk/      # GTK4 + Libadwaita интерфейс (GNOME, большинство Linux)
+├── ui_qt/       # Qt6 / PySide6 + QML интерфейс (Windows, KDE Plasma)
+├── __main__.py  # Точка входа с автоопределением UI (--ui gtk|qt)
+└── main.py      # Обёртка для обратной совместимости
+```
 
 ---
 

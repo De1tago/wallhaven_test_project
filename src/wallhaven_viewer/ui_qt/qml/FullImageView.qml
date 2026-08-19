@@ -18,6 +18,17 @@ Window {
     minimumHeight: 300
     title: "Wallhaven — ID: " + wallpaperId
     modality: Qt.WindowModal
+    color: cBg
+
+    palette.window: cPanel
+    palette.windowText: cText
+    palette.base: cField
+    palette.text: cText
+    palette.button: cPanel
+    palette.buttonText: cText
+    palette.highlight: cAccent
+    palette.highlightedText: "#fcfcfc"
+    palette.placeholderText: cMuted
 
     property bool isDark: cIsDark
     property color textColor: cText

@@ -5,11 +5,17 @@ Button {
     id: root
     property color accent: cAccent
 
+    padding: 6
+    leftPadding: 14
+    rightPadding: 14
+
     background: Rectangle {
-        radius: 8
+        radius: 4
         color: root.down ? Qt.darker(root.accent, 1.12)
               : root.hovered ? Qt.lighter(root.accent, 1.12)
               : root.accent
+        border.width: root.activeFocus ? 2 : 1
+        border.color: root.activeFocus ? "#ffffff" : Qt.darker(root.accent, 1.2)
     }
 
     contentItem: Label {

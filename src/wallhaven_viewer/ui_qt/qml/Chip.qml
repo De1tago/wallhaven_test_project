@@ -6,26 +6,33 @@ Item {
     property alias text: label.text
     property bool checked: false
     signal toggled(bool checked)
-    property color accent: cAccent
 
-    implicitWidth: label.width + 24
-    implicitHeight: 30
+    implicitWidth: label.width + 28
+    implicitHeight: 32
+
+    // flat — режим для сегментированных групп: без собственной рамки
+    // и скруглений (их задаёт контейнер Segmented).
+    property bool flat: false
+
+    // Активное состояние — фирменный голубой Breeze (#3daee9):
+    // лёгкая голубая подсветка фона + акцентная рамка.
+    property color checkedColor: Qt.rgba(61 / 255, 174 / 255, 233 / 255, 0.22)
+    property color hoverColor: cIsDark ? Qt.lighter(cPanel, 1.18)
+                                       : Qt.darker(cPanel, 1.04)
 
     Rectangle {
         anchors.fill: parent
-        radius: height / 2
-        color: root.checked ? root.accent
-              : (cIsDark ? "#272b2f" : "#ffffff")
-        border.width: 1
-        border.color: root.checked ? root.accent
-              : cBorder
+        radius: root.flat ? 0 : 4
+        color: root.checked ? root.checkedColor
+              : (root.hovered ? root.hoverColor : cPanel)
+        border.width: root.flat ? 0 : 1
+        border.color: root.checked ? cAccent : cBorderSoft
 
         Label {
             id: label
             anchors.centerIn: parent
             font.pixelSize: 12
-            color: root.checked ? "#ffffff"
-                  : cText
+            color: cText
         }
     }
 

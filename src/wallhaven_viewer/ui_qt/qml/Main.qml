@@ -13,7 +13,7 @@ ApplicationWindow {
     title: "Wallhaven Viewer"
 
     background: Rectangle {
-        color: root.bgColor
+        color: cContent
     }
 
     // Цвета темы Breeze приходят из общего контекста (cBg, cText, …)
@@ -65,48 +65,26 @@ ApplicationWindow {
     header: ColumnLayout {
         spacing: 0
 
-        // Строка поиска и действий
+        // Строка 1: навигация слева, поиск по центру (якорь композиции),
+        // настройки справа. Симметричные распорки держат поиск по центру
+        // и не рвут строку пополам на широких окнах.
         ToolBar {
             Layout.fillWidth: true
+            topPadding: 10
+            bottomPadding: 10
             background: Rectangle { color: root.bgColor }
 
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
-                spacing: 10
+                spacing: 12
 
                 ToolButton {
                     icon.name: "view-refresh"
                     onClicked: root.doSearch()
                     ToolTip.visible: hovered
                     ToolTip.text: "Обновить"
-                }
-
-                TextField {
-                    id: searchField
-                    Layout.fillWidth: true
-                    leftPadding: 34
-                    placeholderText: "Поиск обоев (например, cyberpunk)…"
-                    text: backend.query
-                    onAccepted: root.doSearch()
-                    background: Rectangle {
-                        radius: 8
-                        color: root.fieldColor
-                        border.width: 1
-                        border.color: root.borderColor
-                    }
-                    // Интегрированная кнопка «Найти» внутри поля (magnifier)
-                    ToolButton {
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        focusPolicy: Qt.NoFocus
-                        icon.name: "system-search"
-                        onClicked: root.doSearch()
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Найти"
-                        background: Rectangle { color: "transparent" }
-                    }
                 }
 
                 ToolButton {
@@ -121,6 +99,57 @@ ApplicationWindow {
                     ToolTip.text: "Только скачанные обои"
                 }
 
+                Item { Layout.fillWidth: true }
+
+                TextField {
+                    id: searchField
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 460
+                    Layout.alignment: Qt.AlignVCenter
+                    leftPadding: 36
+                    rightPadding: 32
+                    topPadding: 7
+                    bottomPadding: 7
+                    placeholderText: "Поиск обоев (например, cyberpunk)…"
+                    text: backend.query
+                    onAccepted: root.doSearch()
+                    color: root.textColor
+                    placeholderTextColor: root.mutedText
+                    background: Rectangle {
+                        radius: 4
+                        color: root.fieldColor
+                        border.width: searchField.activeFocus ? 2 : 1
+                        border.color: searchField.activeFocus ? root.accent : cBorderSoft
+                    }
+                    // Интегрированная кнопка «Найти» внутри поля (magnifier)
+                    ToolButton {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 8
+                        focusPolicy: Qt.NoFocus
+                        icon.name: "system-search"
+                        onClicked: root.doSearch()
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Найти"
+                        background: Rectangle { color: "transparent" }
+                    }
+                    // Крестик очистки (аналог setClearButtonEnabled)
+                    ToolButton {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 4
+                        focusPolicy: Qt.NoFocus
+                        icon.name: "edit-clear"
+                        visible: searchField.text.length > 0
+                        onClicked: { searchField.text = ""; searchField.forceActiveFocus() }
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Очистить"
+                        background: Rectangle { color: "transparent" }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
                 ToolButton {
                     icon.name: "preferences-system"
                     onClicked: settingsDialog.open()
@@ -130,16 +159,21 @@ ApplicationWindow {
             }
         }
 
-        // Строка фильтров
+        // Строка 2: все фильтры сгруппированы слева единым блоком
+        // (сегментированные группы категорий и рейтинга + списки),
+        // без разрыва по центру. Распорка — только в конце строки.
         ToolBar {
             Layout.fillWidth: true
+            topPadding: 10
+            bottomPadding: 10
             background: Rectangle {
                 color: root.bgColor
+                // Чёткая, но тёмная разделительная линия под панелью
                 Rectangle {
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: 1
-                    color: root.borderColor
+                    color: cContent
                 }
             }
 
@@ -147,67 +181,82 @@ ApplicationWindow {
                 anchors.fill: parent
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
-                spacing: 8
+                spacing: 16
 
-                Chip {
-                    text: "General"
-                    checked: backend.catGeneral
-                    onToggled: { backend.catGeneral = checked; root.doSearch() }
-                }
-                Chip {
-                    text: "Anime"
-                    checked: backend.catAnime
-                    onToggled: { backend.catAnime = checked; root.doSearch() }
-                }
-                Chip {
-                    text: "People"
-                    checked: backend.catPeople
-                    onToggled: { backend.catPeople = checked; root.doSearch() }
-                }
-
-                Rectangle { width: 1; height: 22; color: root.borderColor }
-
-                Chip {
-                    text: "SFW"
-                    checked: backend.puritySfw
-                    onToggled: { backend.puritySfw = checked; root.doSearch() }
-                }
-                Chip {
-                    text: "Sketchy"
-                    checked: backend.puritySketchy
-                    onToggled: { backend.puritySketchy = checked; root.doSearch() }
-                }
-                Chip {
-                    text: "NSFW"
-                    checked: backend.purityNsfw
-                    onToggled: { backend.purityNsfw = checked; root.doSearch() }
+                // Категории — сегментированная группа
+                Segmented {
+                    Chip {
+                        flat: true
+                        text: "General"
+                        checked: backend.catGeneral
+                        onToggled: { backend.catGeneral = checked; root.doSearch() }
+                    }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
+                    Chip {
+                        flat: true
+                        text: "Anime"
+                        checked: backend.catAnime
+                        onToggled: { backend.catAnime = checked; root.doSearch() }
+                    }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
+                    Chip {
+                        flat: true
+                        text: "People"
+                        checked: backend.catPeople
+                        onToggled: { backend.catPeople = checked; root.doSearch() }
+                    }
                 }
 
-                Item { Layout.fillWidth: true }
+                // Рейтинг — сегментированная группа
+                Segmented {
+                    Chip {
+                        flat: true
+                        text: "SFW"
+                        checked: backend.puritySfw
+                        onToggled: { backend.puritySfw = checked; root.doSearch() }
+                    }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
+                    Chip {
+                        flat: true
+                        text: "Sketchy"
+                        checked: backend.puritySketchy
+                        onToggled: { backend.puritySketchy = checked; root.doSearch() }
+                    }
+                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
+                    Chip {
+                        flat: true
+                        text: "NSFW"
+                        checked: backend.purityNsfw
+                        onToggled: { backend.purityNsfw = checked; root.doSearch() }
+                    }
+                }
 
-                ComboBox {
+                ThemeComboBox {
                     id: sortBox
                     model: backend.sortLabels
                     currentIndex: backend.sortIndex
                     onActivated: { backend.sortIndex = currentIndex; root.doSearch() }
-                    implicitWidth: 140
+                    implicitWidth: 130
                 }
 
-                ComboBox {
+                ThemeComboBox {
                     id: resBox
                     model: backend.resolutionLabels
                     currentIndex: backend.resolutionIndex
                     onActivated: { backend.resolutionIndex = currentIndex; root.doSearch() }
-                    implicitWidth: 150
+                    implicitWidth: 130
                 }
 
-                ComboBox {
+                ThemeComboBox {
                     id: ratioBox
                     model: backend.ratioLabels
                     currentIndex: backend.ratioIndex
                     onActivated: { backend.ratioIndex = currentIndex; root.doSearch() }
-                    implicitWidth: 130
+                    implicitWidth: 120
                 }
+
+                // Распорка только в конце — группа фильтров не разорвана
+                Item { Layout.fillWidth: true }
             }
         }
     }

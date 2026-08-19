@@ -9,8 +9,27 @@ Dialog {
     title: "Настройки"
     modal: true
     width: 460
-    height: 320
+    height: 340
     standardButtons: Dialog.Ok | Dialog.Cancel
+
+    // Явно задаём палитру диалога, чтобы фон, текст и кнопки
+    // соответствовали теме Breeze (иначе диалог рисуется в дефолтной
+    // светлой раскраске QtQuick.Controls).
+    palette.window: cPanel
+    palette.windowText: cText
+    palette.base: cField
+    palette.text: cText
+    palette.button: cPanel
+    palette.buttonText: cText
+    palette.highlight: cAccent
+    palette.highlightedText: "#fcfcfc"
+    palette.placeholderText: cMuted
+
+    // Фон диалога в цвет темы
+    background: Rectangle {
+        color: cPanel
+        radius: 4
+    }
 
     onAccepted: {
         backend.apiKey = apiKeyField.text
@@ -18,64 +37,103 @@ Dialog {
         backend.columns = colsSpin.value
     }
 
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 12
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 12
 
-            Label { text: "API Ключ (для NSFW/Sketchy):" }
+        Label {
+            text: "API Ключ (для NSFW/Sketchy):"
+            color: cText
+        }
+        TextField {
+            id: apiKeyField
+            Layout.fillWidth: true
+            text: backend.apiKey
+            placeholderText: "Вставьте ключ из wallhaven.cc"
+            color: cText
+            placeholderTextColor: cMuted
+            background: Rectangle {
+                radius: 4
+                color: cField
+                border.width: apiKeyField.activeFocus ? 2 : 1
+                border.color: apiKeyField.activeFocus ? cAccent : cBorderSoft
+            }
+        }
+
+        Label {
+            text: "Папка для сохранения:"
+            color: cText
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
             TextField {
-                id: apiKeyField
+                id: pathField
                 Layout.fillWidth: true
-                text: backend.apiKey
-                placeholderText: "Вставьте ключ из wallhaven.cc"
+                text: backend.downloadPath
+                placeholderText: "Не выбрана (спрашивать каждый раз)"
+                color: cText
+                placeholderTextColor: cMuted
                 background: Rectangle {
-                    radius: 6
+                    radius: 4
                     color: cField
-                    border.width: 1
-                    border.color: cBorder
+                    border.width: pathField.activeFocus ? 2 : 1
+                    border.color: pathField.activeFocus ? cAccent : cBorderSoft
                 }
             }
-
-            Label { text: "Папка для сохранения:" }
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
-                TextField {
-                    id: pathField
-                    Layout.fillWidth: true
-                    text: backend.downloadPath
-                    placeholderText: "Не выбрана (спрашивать каждый раз)"
-                    background: Rectangle {
-                        radius: 6
-                        color: cField
-                        border.width: 1
-                        border.color: cBorder
-                    }
-                }
-                AccentButton {
-                    text: "Обзор…"
-                    onClicked: folderDialog.open()
-                }
-                Button {
-                    text: "Очистить"
-                    onClicked: pathField.text = ""
-                }
+            AccentButton {
+                text: "Обзор…"
+                onClicked: folderDialog.open()
             }
+            Button {
+                id: clearBtn
+                text: "Очистить"
+                palette.buttonText: cText
+                background: Rectangle {
+                    radius: 4
+                    color: clearBtn.down ? Qt.darker(cPanel, 1.06)
+                          : clearBtn.hovered ? Qt.lighter(cPanel, 1.1)
+                          : cPanel
+                    border.width: clearBtn.activeFocus ? 2 : 1
+                    border.color: clearBtn.activeFocus ? cAccent : cBorderSoft
+                }
+                contentItem: Label {
+                    text: clearBtn.text
+                    color: cText
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: pathField.text = ""
+            }
+        }
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
 
-            Label { text: "Колонок в сетке:" }
+            Label {
+                text: "Колонок в сетке:"
+                color: cText
+            }
             SpinBox {
                 id: colsSpin
                 from: 2
                 to: 10
                 value: backend.columns
+                palette.text: cText
+                palette.buttonText: cText
+                background: Rectangle {
+                    radius: 4
+                    color: cField
+                    border.width: colsSpin.activeFocus ? 2 : 1
+                    border.color: colsSpin.activeFocus ? cAccent : cBorderSoft
+                }
             }
             Item { Layout.fillWidth: true }
         }
+
+        Item { Layout.fillHeight: true }
     }
 
     FolderDialog {

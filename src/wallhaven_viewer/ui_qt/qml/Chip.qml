@@ -8,7 +8,7 @@ Item {
     signal toggled(bool checked)
 
     implicitWidth: label.width + 28
-    implicitHeight: 32
+    implicitHeight: 34
 
     // flat — режим для сегментированных групп: без собственной рамки
     // и скруглений (их задаёт контейнер Segmented).

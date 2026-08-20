@@ -65,9 +65,9 @@ ApplicationWindow {
     header: ColumnLayout {
         spacing: 0
 
-        // Строка 1: навигация слева, поиск по центру (якорь композиции),
-        // настройки справа. Симметричные распорки держат поиск по центру
-        // и не рвут строку пополам на широких окнах.
+        // Строка 1: навигация (обновить/скачанные) слева, распорка,
+        // поиск прижат вправо, за ним — настройки. Классический
+        // десктоп-каркас без перекоса веса.
         ToolBar {
             Layout.fillWidth: true
             topPadding: 10
@@ -82,6 +82,8 @@ ApplicationWindow {
 
                 ToolButton {
                     icon.name: "view-refresh"
+                    icon.color: root.textColor
+                    implicitHeight: 34
                     onClicked: root.doSearch()
                     ToolTip.visible: hovered
                     ToolTip.text: "Обновить"
@@ -91,6 +93,8 @@ ApplicationWindow {
                     checkable: true
                     checked: backend.downloadedMode
                     icon.name: "folder-download"
+                    icon.color: root.textColor
+                    implicitHeight: 34
                     onToggled: {
                         backend.downloadedMode = checked
                         root.doSearch()
@@ -99,17 +103,18 @@ ApplicationWindow {
                     ToolTip.text: "Только скачанные обои"
                 }
 
+                // Распорка прижимает блок навигации влево, а поиск — вправо
                 Item { Layout.fillWidth: true }
 
                 TextField {
                     id: searchField
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: 380
                     Layout.maximumWidth: 460
                     Layout.alignment: Qt.AlignVCenter
                     leftPadding: 36
                     rightPadding: 32
-                    topPadding: 7
-                    bottomPadding: 7
+                    topPadding: 9
+                    bottomPadding: 9
                     placeholderText: "Поиск обоев (например, cyberpunk)…"
                     text: backend.query
                     onAccepted: root.doSearch()
@@ -128,6 +133,7 @@ ApplicationWindow {
                         anchors.leftMargin: 8
                         focusPolicy: Qt.NoFocus
                         icon.name: "system-search"
+                        icon.color: root.mutedText
                         onClicked: root.doSearch()
                         ToolTip.visible: hovered
                         ToolTip.text: "Найти"
@@ -140,6 +146,7 @@ ApplicationWindow {
                         anchors.rightMargin: 4
                         focusPolicy: Qt.NoFocus
                         icon.name: "edit-clear"
+                        icon.color: root.mutedText
                         visible: searchField.text.length > 0
                         onClicked: { searchField.text = ""; searchField.forceActiveFocus() }
                         ToolTip.visible: hovered
@@ -148,10 +155,12 @@ ApplicationWindow {
                     }
                 }
 
-                Item { Layout.fillWidth: true }
-
+                // Без промежуточной распорки: поиск и настройки прижаты
+                // к правому краю (классика десктопа).
                 ToolButton {
-                    icon.name: "preferences-system"
+                    icon.name: "settings-configure"
+                    icon.color: root.textColor
+                    implicitHeight: 34
                     onClicked: settingsDialog.open()
                     ToolTip.visible: hovered
                     ToolTip.text: "Настройки"
@@ -159,9 +168,9 @@ ApplicationWindow {
             }
         }
 
-        // Строка 2: все фильтры сгруппированы слева единым блоком
-        // (сегментированные группы категорий и рейтинга + списки),
-        // без разрыва по центру. Распорка — только в конце строки.
+        // Строка 2: сегментированные группы (категории и рейтинг) слева,
+        // распорка, затем выпадающие списки (сортировка/разрешение/ratio)
+        // прижаты вправо. Ровный прямоугольный каркас.
         ToolBar {
             Layout.fillWidth: true
             topPadding: 10
@@ -231,6 +240,10 @@ ApplicationWindow {
                     }
                 }
 
+                // Распорка между сегментированными группами слева и
+                // выпадающими списками справа — ровный прямоугольный каркас.
+                Item { Layout.fillWidth: true }
+
                 ThemeComboBox {
                     id: sortBox
                     model: backend.sortLabels
@@ -254,9 +267,6 @@ ApplicationWindow {
                     onActivated: { backend.ratioIndex = currentIndex; root.doSearch() }
                     implicitWidth: 120
                 }
-
-                // Распорка только в конце — группа фильтров не разорвана
-                Item { Layout.fillWidth: true }
             }
         }
     }
@@ -311,9 +321,9 @@ ApplicationWindow {
         anchors.margins: 16
         width: Math.min(parent.width - 40, 600)
         height: infoLabel.implicitHeight + 24
-        radius: height / 2
+        radius: 4
         color: root.panelColor
-        border.color: root.borderColor
+        border.color: cBorderSoft
         visible: root.infoVisible
 
         Label {
@@ -366,7 +376,4 @@ ApplicationWindow {
         function onDownloadPathChanged() { if (!backend.downloadedMode) root.doSearch() }
     }
 
-    Component.onCompleted: {
-        root.showInfo("Готово")
-    }
 }

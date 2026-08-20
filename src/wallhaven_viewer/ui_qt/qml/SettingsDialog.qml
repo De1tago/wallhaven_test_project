@@ -8,8 +8,8 @@ Dialog {
 
     title: "Настройки"
     modal: true
-    width: 460
-    height: 340
+    width: 480
+    height: 360
     standardButtons: Dialog.Ok | Dialog.Cancel
 
     // Явно задаём палитру диалога, чтобы фон, текст и кнопки
@@ -28,7 +28,7 @@ Dialog {
     // Фон диалога в цвет темы
     background: Rectangle {
         color: cPanel
-        radius: 4
+        radius: 6
     }
 
     onAccepted: {
@@ -39,7 +39,8 @@ Dialog {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 12
+        anchors.margins: 20
+        spacing: 14
 
         Label {
             text: "API Ключ (для NSFW/Sketchy):"
@@ -52,6 +53,10 @@ Dialog {
             placeholderText: "Вставьте ключ из wallhaven.cc"
             color: cText
             placeholderTextColor: cMuted
+            leftPadding: 12
+            rightPadding: 12
+            topPadding: 9
+            bottomPadding: 9
             background: Rectangle {
                 radius: 4
                 color: cField
@@ -66,7 +71,7 @@ Dialog {
         }
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 8
 
             TextField {
                 id: pathField
@@ -75,6 +80,10 @@ Dialog {
                 placeholderText: "Не выбрана (спрашивать каждый раз)"
                 color: cText
                 placeholderTextColor: cMuted
+                leftPadding: 12
+                rightPadding: 12
+                topPadding: 9
+                bottomPadding: 9
                 background: Rectangle {
                     radius: 4
                     color: cField
@@ -82,18 +91,38 @@ Dialog {
                     border.color: pathField.activeFocus ? cAccent : cBorderSoft
                 }
             }
-            AccentButton {
+            Button {
+                id: browseBtn
                 text: "Обзор…"
+                implicitHeight: 36
+                implicitWidth: 96
+                palette.buttonText: cText
+                background: Rectangle {
+                    radius: 4
+                    color: browseBtn.down ? Qt.darker(cPanel, 1.08)
+                          : browseBtn.hovered ? Qt.lighter(cPanel, 1.12)
+                          : cPanel
+                    border.width: browseBtn.activeFocus ? 2 : 1
+                    border.color: browseBtn.activeFocus ? cAccent : cBorderSoft
+                }
+                contentItem: Label {
+                    text: browseBtn.text
+                    color: cText
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
                 onClicked: folderDialog.open()
             }
             Button {
                 id: clearBtn
                 text: "Очистить"
+                implicitHeight: 36
+                implicitWidth: 96
                 palette.buttonText: cText
                 background: Rectangle {
                     radius: 4
-                    color: clearBtn.down ? Qt.darker(cPanel, 1.06)
-                          : clearBtn.hovered ? Qt.lighter(cPanel, 1.1)
+                    color: clearBtn.down ? Qt.darker(cPanel, 1.08)
+                          : clearBtn.hovered ? Qt.lighter(cPanel, 1.12)
                           : cPanel
                     border.width: clearBtn.activeFocus ? 2 : 1
                     border.color: clearBtn.activeFocus ? cAccent : cBorderSoft
@@ -110,7 +139,7 @@ Dialog {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: 12
 
             Label {
                 text: "Колонок в сетке:"
@@ -121,6 +150,12 @@ Dialog {
                 from: 2
                 to: 10
                 value: backend.columns
+                implicitHeight: 36
+                padding: 6
+                leftPadding: 10
+                rightPadding: 24
+                topPadding: 8
+                bottomPadding: 8
                 palette.text: cText
                 palette.buttonText: cText
                 background: Rectangle {

@@ -14,9 +14,11 @@ ComboBox {
     property color mutedColor: cMuted
     property color accentColor: cAccent
 
-    padding: 6
+    padding: 8
     leftPadding: 12
     rightPadding: indicator.width + 14
+    topPadding: 8
+    bottomPadding: 8
     spacing: 4
     font.pixelSize: 13
 

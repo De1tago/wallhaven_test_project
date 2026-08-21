@@ -54,26 +54,11 @@ Window {
             spacing: 8
 
             Item { Layout.fillWidth: true }
-            Button {
+            AppButton {
                 id: closeBtn
                 text: "Закрыть"
                 implicitHeight: 36
                 implicitWidth: 100
-                palette.buttonText: cText
-                background: Rectangle {
-                    radius: 4
-                    color: closeBtn.down ? Qt.darker(cPanel, 1.08)
-                          : closeBtn.hovered ? Qt.lighter(cPanel, 1.12)
-                          : cPanel
-                    border.width: closeBtn.activeFocus ? 2 : 1
-                    border.color: closeBtn.activeFocus ? cAccent : cBorderSoft
-                }
-                contentItem: Label {
-                    text: closeBtn.text
-                    color: cText
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
                 onClicked: root.close()
             }
         }

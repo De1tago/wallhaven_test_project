@@ -139,26 +139,28 @@ Window {
             Layout.fillWidth: true
             spacing: 8
 
-            AccentButton {
+            AppButton {
                 text: "Сохранить"
+                accent: true
                 enabled: img.status === Image.Ready
                 onClicked: backend.saveTo(root.fullUrl, root.wallpaperId, "")
             }
 
-            AccentButton {
+            AppButton {
                 text: "Установить обоями"
+                accent: true
                 enabled: root.localPath.length > 0
                 onClicked: backend.setWallpaper(root.localPath)
             }
 
-            Button {
+            AppButton {
                 text: "Открыть на сайте"
                 onClicked: backend.openInBrowser(root.wallpaperId)
             }
 
             Item { Layout.fillWidth: true }
 
-            Button {
+            AppButton {
                 text: "Закрыть"
                 onClicked: root.close()
             }

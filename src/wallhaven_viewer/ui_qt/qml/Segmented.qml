@@ -8,9 +8,10 @@ import QtQuick.Layouts
 Rectangle {
     id: root
 
-    radius: 8
-    color: cPanel
-    border.width: 0
+    radius: 4
+    color: cField
+    border.width: 1
+    border.color: cBorderSoft
     clip: true
 
     implicitWidth: row.implicitWidth

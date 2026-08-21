@@ -95,6 +95,7 @@ ApplicationWindow {
                     icon.name: useFileIcons ? "" : "view-refresh-symbolic"
                     icon.source: useFileIcons ? "icons/refresh.svg" : ""
                     icon.color: root.textColor
+                    implicitWidth: 40
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
                     onClicked: root.doSearch()
@@ -102,10 +103,13 @@ ApplicationWindow {
                     ToolTip.text: "Обновить"
                     background: Rectangle {
                         radius: 4
-                        color: parent.hovered ? Qt.lighter(root.panelColor, 1.12)
-                              : "transparent"
-                        border.width: 1
-                        border.color: cBorderSoft
+                        color: parent.down ? Qt.darker(cField, 1.05)
+                              : parent.hovered
+                                ? (cIsDark ? Qt.lighter(cField, 1.06)
+                                           : Qt.darker(cField, 1.04))
+                                : cField
+                        border.width: parent.activeFocus ? 2 : 1
+                        border.color: parent.activeFocus ? cAccent : cBorderSoft
                     }
                 }
 
@@ -114,7 +118,8 @@ ApplicationWindow {
                     checked: backend.downloadedMode
                     icon.name: useFileIcons ? "" : "folder-download-symbolic"
                     icon.source: useFileIcons ? "icons/download.svg" : ""
-                    icon.color: root.textColor
+                    icon.color: parent.checked ? "#fcfcfc" : root.textColor
+                    implicitWidth: 40
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
                     onToggled: {
@@ -125,11 +130,15 @@ ApplicationWindow {
                     ToolTip.text: "Только скачанные обои"
                     background: Rectangle {
                         radius: 4
-                        color: parent.checked ? Qt.lighter(root.accent, 1.4)
-                              : parent.hovered ? Qt.lighter(root.panelColor, 1.12)
-                              : "transparent"
-                        border.width: 1
-                        border.color: parent.checked ? root.accent : cBorderSoft
+                        color: parent.checked ? cAccent
+                              : parent.down ? Qt.darker(cField, 1.05)
+                              : parent.hovered
+                                ? (cIsDark ? Qt.lighter(cField, 1.06)
+                                           : Qt.darker(cField, 1.04))
+                                : cField
+                        border.width: parent.activeFocus ? 2 : 1
+                        border.color: parent.checked ? Qt.darker(cAccent, 1.2)
+                                    : (parent.activeFocus ? cAccent : cBorderSoft)
                     }
                 }
 
@@ -194,6 +203,7 @@ ApplicationWindow {
                     icon.name: useFileIcons ? "" : "application-menu-symbolic"
                     icon.source: useFileIcons ? "icons/menu.svg" : ""
                     icon.color: root.textColor
+                    implicitWidth: 40
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
                     onClicked: {
@@ -208,10 +218,13 @@ ApplicationWindow {
                     ToolTip.text: "Меню"
                     background: Rectangle {
                         radius: 4
-                        color: parent.hovered ? Qt.lighter(root.panelColor, 1.12)
-                              : "transparent"
-                        border.width: 1
-                        border.color: cBorderSoft
+                        color: parent.down ? Qt.darker(cField, 1.05)
+                              : parent.hovered
+                                ? (cIsDark ? Qt.lighter(cField, 1.06)
+                                           : Qt.darker(cField, 1.04))
+                                : cField
+                        border.width: parent.activeFocus ? 2 : 1
+                        border.color: parent.activeFocus ? cAccent : cBorderSoft
                     }
 
                     // Плавающее меню (Popup) с небольшим скруглением,
@@ -233,8 +246,7 @@ ApplicationWindow {
                         ColumnLayout {
                             spacing: 4
 
-                            Button {
-                                flat: true
+                            AppButton {
                                 icon.name: useFileIcons ? "" : "settings-configure-symbolic"
                                 icon.source: useFileIcons ? "icons/settings.svg" : ""
                                 icon.color: cText
@@ -244,22 +256,12 @@ ApplicationWindow {
                                 leftPadding: 12
                                 rightPadding: 12
                                 spacing: 10
-                                palette.buttonText: cText
-                                background: Rectangle {
-                                    radius: 4
-                                    color: parent.hovered
-                                           ? Qt.lighter(cPanel, 1.12)
-                                           : "transparent"
-                                    border.width: 1
-                                    border.color: cBorderSoft
-                                }
                                 onClicked: {
                                     burgerMenu.close()
                                     root.openFloating(settingsDialog)
                                 }
                             }
-                            Button {
-                                flat: true
+                            AppButton {
                                 icon.name: useFileIcons ? "" : "help-about-symbolic"
                                 icon.source: useFileIcons ? "icons/about.svg" : ""
                                 icon.color: cText
@@ -269,15 +271,6 @@ ApplicationWindow {
                                 leftPadding: 12
                                 rightPadding: 12
                                 spacing: 10
-                                palette.buttonText: cText
-                                background: Rectangle {
-                                    radius: 4
-                                    color: parent.hovered
-                                           ? Qt.lighter(cPanel, 1.12)
-                                           : "transparent"
-                                    border.width: 1
-                                    border.color: cBorderSoft
-                                }
                                 onClicked: {
                                     burgerMenu.close()
                                     root.openFloating(aboutDialog)

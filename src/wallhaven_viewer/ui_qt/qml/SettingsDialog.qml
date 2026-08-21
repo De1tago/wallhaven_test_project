@@ -88,48 +88,18 @@ Window {
                     border.color: pathField.activeFocus ? cAccent : cBorderSoft
                 }
             }
-            Button {
+            AppButton {
                 id: browseBtn
                 text: "Обзор…"
                 implicitHeight: 36
                 implicitWidth: 96
-                palette.buttonText: cText
-                background: Rectangle {
-                    radius: 4
-                    color: browseBtn.down ? Qt.darker(cPanel, 1.08)
-                          : browseBtn.hovered ? Qt.lighter(cPanel, 1.12)
-                          : cPanel
-                    border.width: browseBtn.activeFocus ? 2 : 1
-                    border.color: browseBtn.activeFocus ? cAccent : cBorderSoft
-                }
-                contentItem: Label {
-                    text: browseBtn.text
-                    color: cText
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
                 onClicked: folderDialog.open()
             }
-            Button {
+            AppButton {
                 id: clearBtn
                 text: "Очистить"
                 implicitHeight: 36
                 implicitWidth: 96
-                palette.buttonText: cText
-                background: Rectangle {
-                    radius: 4
-                    color: clearBtn.down ? Qt.darker(cPanel, 1.08)
-                          : clearBtn.hovered ? Qt.lighter(cPanel, 1.12)
-                          : cPanel
-                    border.width: clearBtn.activeFocus ? 2 : 1
-                    border.color: clearBtn.activeFocus ? cAccent : cBorderSoft
-                }
-                contentItem: Label {
-                    text: clearBtn.text
-                    color: cText
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
                 onClicked: pathField.text = ""
             }
         }
@@ -172,48 +142,19 @@ Window {
             spacing: 8
 
             Item { Layout.fillWidth: true }
-            Button {
+            AppButton {
                 id: cancelBtn
                 text: "Отмена"
                 implicitHeight: 36
                 implicitWidth: 100
-                palette.buttonText: cText
-                background: Rectangle {
-                    radius: 4
-                    color: cancelBtn.down ? Qt.darker(cPanel, 1.08)
-                          : cancelBtn.hovered ? Qt.lighter(cPanel, 1.12)
-                          : cPanel
-                    border.width: cancelBtn.activeFocus ? 2 : 1
-                    border.color: cancelBtn.activeFocus ? cAccent : cBorderSoft
-                }
-                contentItem: Label {
-                    text: cancelBtn.text
-                    color: cText
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
                 onClicked: root.close()
             }
-            Button {
+            AppButton {
                 id: saveBtn
                 text: "Сохранить"
                 implicitHeight: 36
                 implicitWidth: 100
-                palette.buttonText: cText
-                background: Rectangle {
-                    radius: 4
-                    color: saveBtn.down ? Qt.darker(cAccent, 1.15)
-                          : saveBtn.hovered ? Qt.lighter(cAccent, 1.1)
-                          : cAccent
-                    border.width: saveBtn.activeFocus ? 2 : 1
-                    border.color: cAccent
-                }
-                contentItem: Label {
-                    text: saveBtn.text
-                    color: "#fcfcfc"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
+                accent: true
                 onClicked: root.save()
             }
         }

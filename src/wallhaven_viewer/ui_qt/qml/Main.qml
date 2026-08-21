@@ -72,6 +72,8 @@ ApplicationWindow {
             Layout.fillWidth: true
             topPadding: 10
             bottomPadding: 10
+            leftPadding: 0
+            rightPadding: 0
             background: Rectangle { color: root.bgColor }
 
             RowLayout {
@@ -81,26 +83,43 @@ ApplicationWindow {
                 spacing: 12
 
                 ToolButton {
-                    icon.name: "view-refresh"
+                    icon.name: "view-refresh-symbolic"
                     icon.color: root.textColor
                     implicitHeight: 34
+                    Layout.alignment: Qt.AlignVCenter
                     onClicked: root.doSearch()
                     ToolTip.visible: hovered
                     ToolTip.text: "Обновить"
+                    background: Rectangle {
+                        radius: 4
+                        color: parent.hovered ? Qt.lighter(root.panelColor, 1.12)
+                              : "transparent"
+                        border.width: 1
+                        border.color: cBorderSoft
+                    }
                 }
 
                 ToolButton {
                     checkable: true
                     checked: backend.downloadedMode
-                    icon.name: "folder-download"
+                    icon.name: "folder-download-symbolic"
                     icon.color: root.textColor
                     implicitHeight: 34
+                    Layout.alignment: Qt.AlignVCenter
                     onToggled: {
                         backend.downloadedMode = checked
                         root.doSearch()
                     }
                     ToolTip.visible: hovered
                     ToolTip.text: "Только скачанные обои"
+                    background: Rectangle {
+                        radius: 4
+                        color: parent.checked ? Qt.lighter(root.accent, 1.4)
+                              : parent.hovered ? Qt.lighter(root.panelColor, 1.12)
+                              : "transparent"
+                        border.width: 1
+                        border.color: parent.checked ? root.accent : cBorderSoft
+                    }
                 }
 
                 // Распорка прижимает блок навигации влево, а поиск — вправо
@@ -132,7 +151,7 @@ ApplicationWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: 8
                         focusPolicy: Qt.NoFocus
-                        icon.name: "system-search"
+                        icon.name: "system-search-symbolic"
                         icon.color: root.mutedText
                         onClicked: root.doSearch()
                         ToolTip.visible: hovered
@@ -145,7 +164,7 @@ ApplicationWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.rightMargin: 4
                         focusPolicy: Qt.NoFocus
-                        icon.name: "edit-clear"
+                        icon.name: "edit-clear-symbolic"
                         icon.color: root.mutedText
                         visible: searchField.text.length > 0
                         onClicked: { searchField.text = ""; searchField.forceActiveFocus() }
@@ -155,15 +174,101 @@ ApplicationWindow {
                     }
                 }
 
-                // Без промежуточной распорки: поиск и настройки прижаты
+                // Без промежуточной распорки: поиск и меню прижаты
                 // к правому краю (классика десктопа).
                 ToolButton {
-                    icon.name: "settings-configure"
+                    id: menuButton
+                    icon.name: "application-menu-symbolic"
                     icon.color: root.textColor
                     implicitHeight: 34
-                    onClicked: settingsDialog.open()
+                    Layout.alignment: Qt.AlignVCenter
+                    onClicked: {
+                        var br = menuButton.mapToItem(Overlay.overlay,
+                                                      menuButton.width,
+                                                      menuButton.height)
+                        burgerMenu.x = Math.max(8, br.x - burgerMenu.width)
+                        burgerMenu.y = br.y
+                        burgerMenu.open()
+                    }
                     ToolTip.visible: hovered
-                    ToolTip.text: "Настройки"
+                    ToolTip.text: "Меню"
+                    background: Rectangle {
+                        radius: 4
+                        color: parent.hovered ? Qt.lighter(root.panelColor, 1.12)
+                              : "transparent"
+                        border.width: 1
+                        border.color: cBorderSoft
+                    }
+
+                    // Плавающее меню (Popup) с небольшим скруглением,
+                    // как у кнопок/выпадающих списков. Кастомный фон
+                    // у Menu ломает авторазмер в этой сборке Qt, поэтому
+                    // используем Popup с собственным содержимым.
+                    Popup {
+                        id: burgerMenu
+                        parent: Overlay.overlay
+                        padding: 4
+                        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+                        background: Rectangle {
+                            color: cPanel
+                            radius: 4
+                            border.width: 1
+                            border.color: cBorderSoft
+                        }
+
+                        ColumnLayout {
+                            spacing: 4
+
+                            Button {
+                                flat: true
+                                icon.name: "settings-configure-symbolic"
+                                icon.color: cText
+                                text: "Настройки"
+                                implicitWidth: 190
+                                implicitHeight: 34
+                                leftPadding: 12
+                                rightPadding: 12
+                                spacing: 10
+                                palette.buttonText: cText
+                                background: Rectangle {
+                                    radius: 4
+                                    color: parent.hovered
+                                           ? Qt.lighter(cPanel, 1.12)
+                                           : "transparent"
+                                    border.width: 1
+                                    border.color: cBorderSoft
+                                }
+                                onClicked: {
+                                    burgerMenu.close()
+                                    root.openFloating(settingsDialog)
+                                }
+                            }
+                            Button {
+                                flat: true
+                                icon.name: "help-about-symbolic"
+                                icon.color: cText
+                                text: "О программе"
+                                implicitWidth: 190
+                                implicitHeight: 34
+                                leftPadding: 12
+                                rightPadding: 12
+                                spacing: 10
+                                palette.buttonText: cText
+                                background: Rectangle {
+                                    radius: 4
+                                    color: parent.hovered
+                                           ? Qt.lighter(cPanel, 1.12)
+                                           : "transparent"
+                                    border.width: 1
+                                    border.color: cBorderSoft
+                                }
+                                onClicked: {
+                                    burgerMenu.close()
+                                    root.openFloating(aboutDialog)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -175,6 +280,8 @@ ApplicationWindow {
             Layout.fillWidth: true
             topPadding: 10
             bottomPadding: 10
+            leftPadding: 0
+            rightPadding: 0
             background: Rectangle {
                 color: root.bgColor
                 // Чёткая, но тёмная разделительная линия под панелью
@@ -200,14 +307,12 @@ ApplicationWindow {
                         checked: backend.catGeneral
                         onToggled: { backend.catGeneral = checked; root.doSearch() }
                     }
-                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
                     Chip {
                         flat: true
                         text: "Anime"
                         checked: backend.catAnime
                         onToggled: { backend.catAnime = checked; root.doSearch() }
                     }
-                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
                     Chip {
                         flat: true
                         text: "People"
@@ -224,14 +329,12 @@ ApplicationWindow {
                         checked: backend.puritySfw
                         onToggled: { backend.puritySfw = checked; root.doSearch() }
                     }
-                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
                     Chip {
                         flat: true
                         text: "Sketchy"
                         checked: backend.puritySketchy
                         onToggled: { backend.puritySketchy = checked; root.doSearch() }
                     }
-                    Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 18; color: cBorderSoft }
                     Chip {
                         flat: true
                         text: "NSFW"
@@ -359,9 +462,17 @@ ApplicationWindow {
     // ------------------------------------------------------------------
     // Настройки
     // ------------------------------------------------------------------
-    SettingsDialog {
-        id: settingsDialog
-        parent: Overlay.overlay
+    SettingsDialog { id: settingsDialog }
+    AboutDialog { id: aboutDialog }
+
+    // Показывает плавающее окно по центру главного окна
+    // (вложенный Window автоматически transient, координаты
+    // считаются относительно главного окна).
+    function openFloating(win) {
+        win.x = Math.round((root.width - win.width) / 2)
+        win.y = Math.round((root.height - win.height) / 2)
+        win.show()
+        win.requestActivate()
     }
 
     Connections {

@@ -2,19 +2,21 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtQuick.Window
 
-Dialog {
+Window {
     id: root
 
     title: "Настройки"
-    modal: true
     width: 480
     height: 360
-    standardButtons: Dialog.Ok | Dialog.Cancel
+    flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint
+    modality: Qt.NonModal
+    color: cContent
 
-    // Явно задаём палитру диалога, чтобы фон, текст и кнопки
-    // соответствовали теме Breeze (иначе диалог рисуется в дефолтной
-    // светлой раскраске QtQuick.Controls).
+    // Явно задаём палитру, чтобы поля, текст и кнопки соответствовали
+    // теме Breeze (иначе рисуются в дефолтной светлой раскраске
+    // QtQuick.Controls).
     palette.window: cPanel
     palette.windowText: cText
     palette.base: cField
@@ -25,16 +27,11 @@ Dialog {
     palette.highlightedText: "#fcfcfc"
     palette.placeholderText: cMuted
 
-    // Фон диалога в цвет темы
-    background: Rectangle {
-        color: cPanel
-        radius: 6
-    }
-
-    onAccepted: {
+    function save() {
         backend.apiKey = apiKeyField.text
         backend.downloadPath = pathField.text
         backend.columns = colsSpin.value
+        root.close()
     }
 
     ColumnLayout {
@@ -169,6 +166,57 @@ Dialog {
         }
 
         Item { Layout.fillHeight: true }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Item { Layout.fillWidth: true }
+            Button {
+                id: cancelBtn
+                text: "Отмена"
+                implicitHeight: 36
+                implicitWidth: 100
+                palette.buttonText: cText
+                background: Rectangle {
+                    radius: 4
+                    color: cancelBtn.down ? Qt.darker(cPanel, 1.08)
+                          : cancelBtn.hovered ? Qt.lighter(cPanel, 1.12)
+                          : cPanel
+                    border.width: cancelBtn.activeFocus ? 2 : 1
+                    border.color: cancelBtn.activeFocus ? cAccent : cBorderSoft
+                }
+                contentItem: Label {
+                    text: cancelBtn.text
+                    color: cText
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: root.close()
+            }
+            Button {
+                id: saveBtn
+                text: "Сохранить"
+                implicitHeight: 36
+                implicitWidth: 100
+                palette.buttonText: cText
+                background: Rectangle {
+                    radius: 4
+                    color: saveBtn.down ? Qt.darker(cAccent, 1.15)
+                          : saveBtn.hovered ? Qt.lighter(cAccent, 1.1)
+                          : cAccent
+                    border.width: saveBtn.activeFocus ? 2 : 1
+                    border.color: cAccent
+                }
+                contentItem: Label {
+                    text: saveBtn.text
+                    color: "#fcfcfc"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: root.save()
+            }
+        }
     }
 
     FolderDialog {

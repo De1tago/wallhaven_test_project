@@ -25,7 +25,7 @@ Item {
         radius: root.flat ? 0 : 4
         color: root.checked ? root.checkedColor
               : (root.hovered ? root.hoverColor : cPanel)
-        border.width: root.flat ? 0 : 1
+        border.width: 1
         border.color: root.checked ? cAccent : cBorderSoft
 
         Label {

@@ -76,11 +76,12 @@
                     <property name="margin-bottom">10</property>
                     
                     <child>
-                      <object class="GtkBox" id="cat_box">
-                        <property name="orientation">horizontal</property>
-                        <style>
-                          <class name="linked"/>
-                        </style>
+                        <object class="GtkBox" id="cat_box">
+                          <property name="orientation">horizontal</property>
+                          <style>
+                            <class name="linked"/>
+                            <class name="round-linked"/>
+                          </style>
                         <child>
                           <object class="GtkToggleButton" id="btn_general">
                             <property name="label">General</property>
@@ -100,11 +101,12 @@
                     </child>
                     
                     <child>
-                      <object class="GtkBox" id="purity_box">
-                        <property name="orientation">horizontal</property>
-                        <style>
-                          <class name="linked"/>
-                        </style>
+                        <object class="GtkBox" id="purity_box">
+                          <property name="orientation">horizontal</property>
+                          <style>
+                            <class name="linked"/>
+                            <class name="round-linked"/>
+                          </style>
                         <child>
                           <object class="GtkToggleButton" id="btn_sfw">
                             <property name="label">SFW</property>

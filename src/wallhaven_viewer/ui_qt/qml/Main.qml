@@ -314,6 +314,7 @@ ApplicationWindow {
                         flat: true
                         text: "General"
                         checked: backend.catGeneral
+                        leftRounded: true
                         onToggled: { backend.catGeneral = checked; root.doSearch() }
                     }
                     Chip {
@@ -326,6 +327,8 @@ ApplicationWindow {
                         flat: true
                         text: "People"
                         checked: backend.catPeople
+                        rightRounded: true
+                        showRightDivider: false
                         onToggled: { backend.catPeople = checked; root.doSearch() }
                     }
                 }
@@ -336,6 +339,7 @@ ApplicationWindow {
                         flat: true
                         text: "SFW"
                         checked: backend.puritySfw
+                        leftRounded: true
                         onToggled: { backend.puritySfw = checked; root.doSearch() }
                     }
                     Chip {
@@ -348,6 +352,8 @@ ApplicationWindow {
                         flat: true
                         text: "NSFW"
                         checked: backend.purityNsfw
+                        rightRounded: true
+                        showRightDivider: false
                         onToggled: { backend.purityNsfw = checked; root.doSearch() }
                     }
                 }

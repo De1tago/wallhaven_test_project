@@ -178,6 +178,13 @@ class WallhavenQtApp:
 
         engine.rootContext().setContextProperty("backend", backend)
 
+        # На Linux берём нативные иконки темы (Breeze/Adwaita и т.п.),
+        # на Windows и прочих ОС — подгружаем из файлов (папка qml/icons),
+        # т.к. там нет системной темы значков.
+        engine.rootContext().setContextProperty(
+            "useFileIcons", not sys.platform.startswith("linux")
+        )
+
         from PySide6.QtGui import QColor
 
         # Применяем палитру и общие цвета темы. Вызывается при старте

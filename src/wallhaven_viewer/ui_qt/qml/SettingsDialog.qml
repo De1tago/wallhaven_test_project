@@ -74,7 +74,7 @@ Window {
                 id: pathField
                 Layout.fillWidth: true
                 text: backend.downloadPath
-                placeholderText: "Не выбрана (спрашивать каждый раз)"
+                placeholderText: "Не выбрана (по умолчанию: Загрузки/Wallhaven)"
                 color: cText
                 placeholderTextColor: cMuted
                 leftPadding: 12
@@ -224,11 +224,9 @@ Window {
         title: "Выберите папку для сохранения"
 
         onAccepted: {
-            var path = selectedFolder.toString()
-            if (path.startsWith("file://")) {
-                path = path.slice(7)
-            }
-            pathField.text = path
+            // toLocalFile() корректно преобразует file:///C:/... в C:/...
+            // (без ведущего слэша, иначе на Windows путь невалиден).
+            pathField.text = selectedFolder.toLocalFile()
         }
     }
 }

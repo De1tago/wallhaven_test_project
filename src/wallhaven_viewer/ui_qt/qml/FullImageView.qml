@@ -153,8 +153,6 @@ Window {
         function onSaved(path, error) {
             if (path.length > 0) {
                 root.localPath = path
-            } else if (error === "no_download_path") {
-                saveDialog.open()
             } else {
                 statusLabel.text = "Ошибка сохранения: " + error
             }

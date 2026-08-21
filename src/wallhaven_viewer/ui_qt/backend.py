@@ -43,6 +43,7 @@ class WallpaperListModel(QAbstractListModel):
         "Thumb": Qt.UserRole + 2,
         "FullUrl": Qt.UserRole + 3,
         "LocalPath": Qt.UserRole + 4,
+        "LocalUrl": Qt.UserRole + 5,
     }
 
     def __init__(self, parent=None):
@@ -64,6 +65,12 @@ class WallpaperListModel(QAbstractListModel):
             return item.full_url
         if role == self.Role["LocalPath"]:
             return item.local_path or ""
+        if role == self.Role["LocalUrl"]:
+            from PySide6.QtCore import QUrl
+
+            if item.local_path:
+                return QUrl.fromLocalFile(item.local_path).toString()
+            return ""
         return None
 
     def roleNames(self):
@@ -72,6 +79,7 @@ class WallpaperListModel(QAbstractListModel):
             self.Role["Thumb"]: b"thumb",
             self.Role["FullUrl"]: b"fullUrl",
             self.Role["LocalPath"]: b"localPath",
+            self.Role["LocalUrl"]: b"localUrl",
         }
 
     def set_items(self, items):
@@ -193,7 +201,8 @@ class Backend(QObject):
     def scan_downloaded(self):
         """Сканирует папку загрузок и индексирует файлы по ID обоев."""
         self.downloaded_files = {}
-        download_path = self._settings.get("download_path", "")
+        raw = self._normalize_path(self._settings.get("download_path", ""))
+        download_path = raw if raw else self._default_download_dir()
         if download_path and os.path.isdir(download_path):
             for ext in ("*.jpg", "*.jpeg", "*.png"):
                 for file_path in glob.glob(os.path.join(download_path, ext)):
@@ -340,10 +349,25 @@ class Backend(QObject):
 
     @downloadPath.setter
     def downloadPath(self, value):
-        self._settings["download_path"] = value
+        self._settings["download_path"] = self._normalize_path(value)
         self._persist()
         self.downloadPathChanged.emit()
         self.scan_downloaded()
+
+    @staticmethod
+    def _normalize_path(path):
+        """Приводит путь из QML (возможно, с префиксом file:// и ведущим
+        слэшем перед буквой диска на Windows, например ``/C:/...``) к
+        корректному локальному пути."""
+        path = (path or "").strip()
+        if not path:
+            return path
+        if path.startswith("file://"):
+            path = path[7:]
+        # Windows: "/C:/Users/..." -> "C:/Users/..."
+        if len(path) > 2 and path[0] == "/" and path[2] == ":":
+            path = path[1:]
+        return path
 
     @Property(bool, notify=downloadedModeChanged)
     def downloadedMode(self):
@@ -532,16 +556,29 @@ class Backend(QObject):
         def worker():
             try:
                 if destination and destination.strip():
-                    local_path = destination.strip()
+                    local_path = self._normalize_path(destination)
                 else:
-                    ext = url.rsplit(".", 1)[-1].lower() if "." in url else "jpg"
-                    if ext not in ("jpg", "jpeg", "png"):
-                        ext = "jpg"
-                    download_path = self._settings.get("download_path", "")
-                    if not download_path or not os.path.isdir(download_path):
-                        self.saved.emit("", "no_download_path")
-                        return
-                    local_path = os.path.join(download_path, f"{wallpaper_id}.{ext}")
+                    # Имя файла берём с сайта (basename URL), например
+                    # wallhaven-xxxxxxxx.jpg — так же, как на Linux.
+                    basename = url.rsplit("/", 1)[-1]
+                    if not basename or "." not in basename:
+                        ext = url.rsplit(".", 1)[-1].lower() if "." in url else "jpg"
+                        if ext not in ("jpg", "jpeg", "png"):
+                            ext = "jpg"
+                        basename = f"{wallpaper_id}.{ext}"
+
+                    download_path = self._normalize_path(
+                        self._settings.get("download_path", "")
+                    )
+                    if not download_path:
+                        # Папка не указана в настройках — используем папку
+                        # «Wallhaven» внутри стандартных «Загрузок». Запрашивать
+                        # имя файла не нужно (как на Linux с настроенным путём).
+                        download_path = self._default_download_dir()
+                    # Уважаем выбор пользователя: даже если указанной папки
+                    # ещё нет — создаём её, а не подменяем дефолтом.
+                    os.makedirs(download_path, exist_ok=True)
+                    local_path = os.path.join(download_path, basename)
 
                 resp = requests.get(url, timeout=60)
                 resp.raise_for_status()
@@ -555,6 +592,25 @@ class Backend(QObject):
                 self.saved.emit("", str(e))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _default_download_dir(self):
+        """Возвращает папку для сохранения по умолчанию (…/Wallhaven)."""
+        try:
+            candidates = []
+            env = os.environ.get("XDG_DOWNLOAD_DIR")
+            if env:
+                candidates.append(Path(env))
+            # Стандартные папки загрузок/документов (Windows, Linux, macOS)
+            candidates.append(Path.home() / "Downloads")
+            candidates.append(Path.home() / "Загрузки")
+            candidates.append(Path.home() / "Documents")
+            candidates.append(Path.home() / "Документы")
+            for c in candidates:
+                if c.is_dir():
+                    return str(c / "Wallhaven")
+            return str(Path.home() / "Wallhaven")
+        except Exception:
+            return str(Path.home() / "Wallhaven")
 
     def _write_sidecar(self, image_path, wallpaper_id):
         """Записывает sidecar-метаданные (в кэш-директорию)."""

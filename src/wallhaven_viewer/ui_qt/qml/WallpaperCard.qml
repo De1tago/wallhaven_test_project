@@ -9,6 +9,7 @@ Item {
     property string thumb: ""
     property string fullUrl: ""
     property string localPath: ""
+    property string localUrl: ""
 
     signal clicked()
 
@@ -25,7 +26,7 @@ Item {
         Image {
             id: img
             anchors.fill: parent
-            source: localPath.length > 0 ? localPath : thumb
+            source: localPath.length > 0 ? localUrl : thumb
             asynchronous: true
             cache: true
             fillMode: Image.PreserveAspectCrop

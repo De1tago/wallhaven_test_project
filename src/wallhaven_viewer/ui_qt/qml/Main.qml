@@ -83,7 +83,8 @@ ApplicationWindow {
                 spacing: 12
 
                 ToolButton {
-                    icon.name: "view-refresh-symbolic"
+                    icon.name: useFileIcons ? "" : "view-refresh-symbolic"
+                    icon.source: useFileIcons ? "icons/refresh.svg" : ""
                     icon.color: root.textColor
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
@@ -102,7 +103,8 @@ ApplicationWindow {
                 ToolButton {
                     checkable: true
                     checked: backend.downloadedMode
-                    icon.name: "folder-download-symbolic"
+                    icon.name: useFileIcons ? "" : "folder-download-symbolic"
+                    icon.source: useFileIcons ? "icons/download.svg" : ""
                     icon.color: root.textColor
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
@@ -151,7 +153,8 @@ ApplicationWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: 8
                         focusPolicy: Qt.NoFocus
-                        icon.name: "system-search-symbolic"
+                        icon.name: useFileIcons ? "" : "system-search-symbolic"
+                        icon.source: useFileIcons ? "icons/search.svg" : ""
                         icon.color: root.mutedText
                         onClicked: root.doSearch()
                         ToolTip.visible: hovered
@@ -164,7 +167,8 @@ ApplicationWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.rightMargin: 4
                         focusPolicy: Qt.NoFocus
-                        icon.name: "edit-clear-symbolic"
+                        icon.name: useFileIcons ? "" : "edit-clear-symbolic"
+                        icon.source: useFileIcons ? "icons/clear.svg" : ""
                         icon.color: root.mutedText
                         visible: searchField.text.length > 0
                         onClicked: { searchField.text = ""; searchField.forceActiveFocus() }
@@ -178,7 +182,8 @@ ApplicationWindow {
                 // к правому краю (классика десктопа).
                 ToolButton {
                     id: menuButton
-                    icon.name: "application-menu-symbolic"
+                    icon.name: useFileIcons ? "" : "application-menu-symbolic"
+                    icon.source: useFileIcons ? "icons/menu.svg" : ""
                     icon.color: root.textColor
                     implicitHeight: 34
                     Layout.alignment: Qt.AlignVCenter
@@ -221,7 +226,8 @@ ApplicationWindow {
 
                             Button {
                                 flat: true
-                                icon.name: "settings-configure-symbolic"
+                                icon.name: useFileIcons ? "" : "settings-configure-symbolic"
+                                icon.source: useFileIcons ? "icons/settings.svg" : ""
                                 icon.color: cText
                                 text: "Настройки"
                                 implicitWidth: 190
@@ -245,7 +251,8 @@ ApplicationWindow {
                             }
                             Button {
                                 flat: true
-                                icon.name: "help-about-symbolic"
+                                icon.name: useFileIcons ? "" : "help-about-symbolic"
+                                icon.source: useFileIcons ? "icons/about.svg" : ""
                                 icon.color: cText
                                 text: "О программе"
                                 implicitWidth: 190
@@ -394,6 +401,7 @@ ApplicationWindow {
             thumb: model.thumb
             fullUrl: model.fullUrl
             localPath: model.localPath
+            localUrl: model.localUrl
             onClicked: root.openFull(wallpaperId, fullUrl, localPath)
         }
 

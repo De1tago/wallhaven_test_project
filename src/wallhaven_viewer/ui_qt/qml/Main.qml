@@ -29,6 +29,7 @@ ApplicationWindow {
     property bool loading: false
     property string infoText: ""
     property bool infoVisible: false
+    property var _fullView: null
 
     function doSearch() {
         searchField.focus = false
@@ -47,10 +48,18 @@ ApplicationWindow {
 
     function openFull(id, url, localPath) {
         var obj = fullViewComponent.createObject(null)
+        root._fullView = obj
         obj.wallpaperId = id
         obj.fullUrl = url
         obj.localPath = localPath
         obj.visible = true
+    }
+
+    function closeFull() {
+        if (root._fullView) {
+            root._fullView.close()
+            root._fullView = null
+        }
     }
 
     function showInfo(message) {
@@ -492,6 +501,11 @@ ApplicationWindow {
             Qt.callLater(root.maybeLoadMore)
         }
         function onInfoMessage(message) { root.showInfo(message) }
+        function onTagSearchRequested(tag) {
+            searchField.text = tag
+            root.closeFull()
+            root.doSearch()
+        }
         function onDownloadPathChanged() { if (!backend.downloadedMode) root.doSearch() }
     }
 

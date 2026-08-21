@@ -119,6 +119,8 @@ class Backend(QObject):
     searchFinished = Signal()
     saved = Signal(str, str)  # (path, error) — path пуст при ошибке
     wallpaperSet = Signal(str)  # результат установки обоев (описание)
+    tagsLoaded = Signal(str, list)  # (wallpaper_id, [имена тегов])
+    tagSearchRequested = Signal(str)  # клик по тегу -> поиск по имени тега
 
     # Notify-сигналы для свойств настроек
     columnsChanged = Signal()
@@ -671,3 +673,30 @@ class Backend(QObject):
             QDesktopServices.openUrl(f"https://wallhaven.cc/w/{wallpaper_id}")
         except Exception:
             pass
+
+    @Slot(str)
+    def loadTags(self, wallpaper_id):
+        """Загружает теги обоев через API и шлёт сигнал tagsLoaded."""
+        def worker():
+            names = []
+            try:
+                info = WallhavenAPI.get_wallpaper_info(wallpaper_id, timeout=10)
+                if info:
+                    for t in (info.get("tags") or []):
+                        name = t.get("name") if isinstance(t, dict) else str(t)
+                        if name:
+                            names.append(name)
+            except Exception:
+                pass
+            self.tagsLoaded.emit(wallpaper_id, names)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @Slot(str)
+    def searchByTag(self, tag):
+        """Ищет обои по имени тега (как в GTK-версии)."""
+        tag = (tag or "").strip()
+        if not tag:
+            return
+        self.query = tag
+        self.tagSearchRequested.emit(tag)

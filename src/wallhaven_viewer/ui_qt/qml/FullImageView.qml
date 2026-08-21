@@ -41,6 +41,12 @@ Window {
             : ""
     }
 
+    onWallpaperIdChanged: {
+        tagsModel.clear()
+        if (root.wallpaperId.length > 0)
+            backend.loadTags(root.wallpaperId)
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -100,6 +106,35 @@ Window {
             opacity: 0.8
         }
 
+        // Теги обоев (как в GTK-версии): клик по тегу ищет по нему
+        Flow {
+            id: tagsFlow
+            Layout.fillWidth: true
+            spacing: 6
+            visible: tagsModel.count > 0
+
+            Repeater {
+                model: tagsModel
+                delegate: Button {
+                    text: model.name
+                    flat: true
+                    implicitHeight: 30
+                    leftPadding: 12
+                    rightPadding: 12
+                    palette.buttonText: cAccent
+                    background: Rectangle {
+                        radius: 15
+                        color: parent.hovered
+                               ? Qt.lighter(cAccent, 1.4)
+                               : Qt.lighter(cPanel, 1.06)
+                        border.width: 1
+                        border.color: cBorderSoft
+                    }
+                    onClicked: backend.searchByTag(model.name)
+                }
+            }
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -147,8 +182,18 @@ Window {
         }
     }
 
+    ListModel { id: tagsModel }
+
     Connections {
         target: backend
+
+        function onTagsLoaded(id, names) {
+            if (id !== root.wallpaperId)
+                return
+            tagsModel.clear()
+            for (var i = 0; i < names.length; i++)
+                tagsModel.append({ name: names[i] })
+        }
 
         function onSaved(path, error) {
             if (path.length > 0) {

@@ -8,6 +8,9 @@ config.ini
 repo/
 *.flatpak
 *.spec
+# PyInstaller-спецификации — это исходники сборки, нужны для скриптов:
+!wallhaven-viewer.spec
+!wallhaven-viewer-win.spec
 vendor
 .venv
 /src/.qtcreator

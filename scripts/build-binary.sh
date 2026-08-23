@@ -7,7 +7,9 @@ PROJECT_ROOT="$( realpath "$DIR/.." )"
 cd "$PROJECT_ROOT"
 
 echo "==> Активация виртуального окружения..."
-if [ -d venv ]; then
+if [ -d .venv ]; then
+    source .venv/bin/activate
+elif [ -d venv ]; then
     source venv/bin/activate
 fi
 

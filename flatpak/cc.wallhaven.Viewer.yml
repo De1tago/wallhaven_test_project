@@ -1,6 +1,6 @@
 app-id: cc.wallhaven.Viewer
 runtime: org.gnome.Platform
-runtime-version: '49'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 # 1. Меняем на имя исполняемого файла для работы .desktop файла
 command: wallhaven-viewer
@@ -30,8 +30,9 @@ modules:
       build-args:
         - --share=network
     build-commands:
-        # Устанавливаем зависимости в стандартное место /app
-        - pip3 install --prefix=/app requests dbus-python PyGObject
+        # Устанавливаем зависимости в стандартное место /app.
+        # PySide6 нужен для Qt-интерфейса (авто-выбор на KDE/Windows).
+        - pip3 install --prefix=/app requests dbus-python PyGObject PySide6
     sources:
       - type: shell
         commands:

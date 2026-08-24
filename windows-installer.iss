@@ -7,7 +7,7 @@
 ;    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows-installer.iss
 
 #define MyAppName "Wallhaven Desktop Viewer"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "5.0.0"
 #define MyAppPublisher "wallhaven_viewer"
 #define MyAppExeName "wallhaven-viewer.exe"
 #define MyAppURL "https://github.com/"

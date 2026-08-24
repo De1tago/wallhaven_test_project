@@ -358,7 +358,7 @@ class MainWindow(Adw.ApplicationWindow):
             application_name="Wallhaven Viewer",
             application_icon="cc.wallhaven.Viewer",
             developer_name="De1tago",
-            version="0.0.2",
+            version="5.0.0",
             comments="Просмотр и скачивание обоев с Wallhaven.cc",
             website="https://wallhaven.cc",
             copyright="© 2025 De1tago",

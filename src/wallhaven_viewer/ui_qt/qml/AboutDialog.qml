@@ -41,7 +41,7 @@ Window {
         }
         Item { Layout.fillHeight: true }
         Label {
-            text: "Версия 1.0"
+            text: "Версия 5.0.0"
             color: cText
         }
         Label {

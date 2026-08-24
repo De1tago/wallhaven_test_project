@@ -37,8 +37,8 @@ UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
-Name: "russian"; MessagesFile: "compiler:Default.isl"
-Name: "english"; MessagesFile: "compiler:English.isl"
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 ; Дистрибутив PyInstaller (папка dist целиком)

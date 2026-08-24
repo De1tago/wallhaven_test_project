@@ -1,0 +1,72 @@
+app-id: cc.wallhaven.Viewer
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+# 1. Меняем на имя исполняемого файла для работы .desktop файла
+command: wallhaven-viewer
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --metadata=X-DPI-Scale=1
+  # 2. Добавляем ПРАВИЛЬНЫЕ пути для Python 3.13 (как в вашем логе)
+  - --env=PYTHONPATH=/app/lib:/app/lib/python3.13/site-packages
+  - --filesystem=xdg-run/dconf
+  - --filesystem=~/.config/dconf:ro
+  - --talk-name=ca.desrt.dconf
+  - --env=DCONF_USER_CONFIG_DIR=.config/dconf
+  - --talk-name=org.freedesktop.portal.Wallpaper
+  - --talk-name=org.freedesktop.impl.portal.Wallpaper
+
+modules:
+  - name: python3-requests
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+        # Устанавливаем зависимости в стандартное место /app.
+        # PySide6 нужен для Qt-интерфейса (авто-выбор на KDE/Windows).
+        - pip3 install --prefix=/app requests dbus-python PyGObject PySide6
+    sources:
+      - type: shell
+        commands:
+          - echo "Installing dependencies..."
+
+  - name: wallhaven-viewer
+    buildsystem: simple
+    build-commands:
+      # 3. Создаём структуру папок
+      - mkdir -p /app/lib/wallhaven_viewer
+      - mkdir -p /app/bin
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/256x256/apps
+      - mkdir -p /app/share/wallhaven_viewer/css
+      - mkdir -p /app/share/wallhaven_viewer/ui
+      
+      # 4. Копируем сам пакет (содержимое src/wallhaven_viewer)
+      - cp -r src/wallhaven_viewer/* /app/lib/wallhaven_viewer/
+      
+      # 5. Копируем ресурсы
+      - install -m 644 data/ui/*.ui /app/share/wallhaven_viewer/ui/
+      - install -m 644 data/css/*.css /app/share/wallhaven_viewer/css/
+      - install -m 644 data/applications/cc.wallhaven.Viewer.desktop /app/share/applications/
+      - install -m 644 data/icons/hicolor/256x256/apps/cc.wallhaven.Viewer.png /app/share/icons/hicolor/256x256/apps/
+
+      # 6. Создаём тот самый файл wallhaven-viewer, который ищет .desktop
+      - echo '#!/bin/sh' > /app/bin/wallhaven-viewer
+      - echo 'exec python3 -m wallhaven_viewer "$@"' >> /app/bin/wallhaven-viewer
+      - chmod +x /app/bin/wallhaven-viewer
+    sources:
+      - type: dir
+        path: .. # Т.к. манифест в папке flatpak/, поднимаемся выше к папке src
+
+
+# flatpak-builder --force-clean --user --install build-dir ./flatpak/cc.wallhaven.Viewer.yml
+# flatpak-builder --repo=repo --force-clean build-dir ./flatpak/cc.wallhaven.Viewer.yml
+# flatpak build-bundle repo wallhaven-viewer.flatpak cc.wallhaven.Viewer

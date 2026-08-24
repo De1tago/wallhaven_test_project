@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Wallhaven Viewer
+Comment=Просмотр и загрузка обоев с Wallhaven.cc
+# Имя совпадает с тем, что мы прописали в поле command манифеста и в /app/bin/
+Exec=wallhaven-viewer
+# Имя совпадает с именем файла иконки (без .png)
+Icon=cc.wallhaven.Viewer
+Terminal=false
+Categories=Graphics;Utility;
+Keywords=wallpaper;wallhaven;background;
+StartupNotify=true

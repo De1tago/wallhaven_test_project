@@ -1,0 +1,16 @@
+build/
+dist/
+build-dir/
+.flatpak-builder/
+__pycache__/
+config.ini
+*.pkg
+repo/
+*.flatpak
+*.spec
+# PyInstaller-спецификации — это исходники сборки, нужны для скриптов:
+!wallhaven-viewer.spec
+!wallhaven-viewer-win.spec
+vendor
+.venv
+/src/.qtcreator

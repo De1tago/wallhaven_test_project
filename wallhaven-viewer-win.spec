@@ -18,12 +18,18 @@ PROJECT_ROOT = os.path.abspath(SPECPATH)
 SRC = os.path.join(PROJECT_ROOT, "src", "wallhaven_viewer")
 UI_QT = os.path.join(SRC, "ui_qt")
 
+<<<<<<< HEAD
 APP_ICON = os.path.join(PROJECT_ROOT, "assets", "app-icon.ico")
 
 datas = [
     (os.path.join(UI_QT, "qml"), "wallhaven_viewer/ui_qt/qml"),
     (os.path.join(UI_QT, "resources"), "wallhaven_viewer/ui_qt/resources"),
     (APP_ICON, "assets"),
+=======
+datas = [
+    (os.path.join(UI_QT, "qml"), "wallhaven_viewer/ui_qt/qml"),
+    (os.path.join(UI_QT, "resources"), "wallhaven_viewer/ui_qt/resources"),
+>>>>>>> 4cb052948a163044793e8c4d818a8b0115d7b86a
 ]
 
 hiddenimports = [
@@ -69,7 +75,10 @@ exe = EXE(
     a.datas,
     [],
     name="wallhaven-viewer",
+<<<<<<< HEAD
     icon=APP_ICON,
+=======
+>>>>>>> 4cb052948a163044793e8c4d818a8b0115d7b86a
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

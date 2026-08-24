@@ -165,7 +165,6 @@ class WallhavenQtApp:
         app.setOrganizationName("Wallhaven")
         app.setApplicationDisplayName("Wallhaven Viewer")
 
-<<<<<<< HEAD
         # Иконка приложения (заголовок окна и панель задач).
         # В собранном виде (.exe) берём иконку из бандла, иначе —
         # из каталога assets репозитория.
@@ -185,8 +184,6 @@ class WallhavenQtApp:
         except Exception as exc:  # noqa: BLE001
             print(f"[Warn] Не удалось установить иконку: {exc}")
 
-=======
->>>>>>> 4cb052948a163044793e8c4d818a8b0115d7b86a
         # Подключаем нативные иконки темы Breeze. Сам иконочный пакет
         # (breeze-icons.rcc) поставляется вместе с приложением, поэтому
         # иконки отображаются везде — даже под GNOME/в Flatpak, где

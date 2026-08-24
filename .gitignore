@@ -14,5 +14,4 @@ repo/
 vendor
 .venv
 /src/.qtcreator
-*.iss
 installer

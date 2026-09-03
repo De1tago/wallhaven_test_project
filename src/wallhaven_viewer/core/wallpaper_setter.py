@@ -28,12 +28,23 @@ def wallpaper_portal_available() -> bool:
 
 
 def _set_via_portal(image_path: str) -> bool:
-    """Устанавливает обои через xdg-desktop-portal (Wayland/GNOME/KDE)."""
+    """Устанавливает обои через xdg-desktop-portal (Wayland/GNOME/KDE).
+
+    Требует ``dbus-python``: через gdbus CLI невозможно корректно
+    передать UnixFd, поэтому без этой библиотеки портальный метод
+    недоступен и управление возвращается вызывающему коду для
+    использования DE-специфичных методов.
+    """
     if not wallpaper_portal_available():
         return False
+
     try:
         import dbus
         import dbus.types
+    except ImportError:
+        return False
+
+    try:
         bus = dbus.SessionBus()
         iface = dbus.Interface(
             bus.get_object("org.freedesktop.portal.Desktop",
@@ -69,7 +80,20 @@ def _set_gnome(image_path: str) -> bool:
 
 
 def _set_kde(image_path: str) -> bool:
-    """Устанавливает обои в KDE Plasma через D-Bus (qdbus)."""
+    """Устанавливает обои в KDE Plasma через D-Bus или CLI."""
+    # 1. plasma-apply-wallpaperimage (Plasma 5.20+ и Plasma 6)
+    try:
+        result = subprocess.run(
+            ["plasma-apply-wallpaperimage", image_path],
+            check=False, timeout=15,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            return True
+    except FileNotFoundError:
+        pass
+
+    # 2. D-Bus через qdbus6 (Plasma 6) или qdbus (Plasma 5)
     jscript = f"""
     var allDesktops = desktops();
     for (var i = 0; i < allDesktops.length; i++) {{
@@ -79,13 +103,22 @@ def _set_kde(image_path: str) -> bool:
         d.writeConfig("Image", "file://{image_path}");
     }}
     """
-    cmd = ["qdbus", "org.kde.plasmashell", "/PlasmaShell",
-           "org.kde.PlasmaShell.evaluateScript", jscript]
-    try:
-        subprocess.run(cmd, check=False, timeout=15)
-        return True
-    except Exception:
-        return False
+    for qdbus_bin in ("qdbus6", "qdbus"):
+        cmd = [qdbus_bin, "org.kde.plasmashell", "/PlasmaShell",
+               "org.kde.PlasmaShell.evaluateScript", jscript]
+        try:
+            result = subprocess.run(
+                cmd, check=False, timeout=15,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if result.returncode == 0:
+                return True
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+
+    return False
 
 
 def _set_xfce(image_path: str) -> bool:
@@ -134,16 +167,20 @@ def set_desktop_wallpaper(image_path: str) -> bool:
         return _set_windows(image_path)
 
     if sys.platform.startswith("linux"):
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+
+        # KDE — нативный метод надёжнее портала (портал может показать
+        # диалог подтверждения или конфликтовать с управлением обоев Plasma)
+        if "KDE" in desktop:
+            return _set_kde(image_path)
+
         # 1. Портал — работает на Wayland и большинстве DE (включая Flatpak)
         if _set_via_portal(image_path):
             return True
 
         # 2. Запасные методы по окружению
-        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
         if "GNOME" in desktop or "CINNAMON" in desktop:
             return _set_gnome(image_path)
-        if "KDE" in desktop:
-            return _set_kde(image_path)
         if "XFCE" in desktop:
             return _set_xfce(image_path)
         # Wayland без портала и без опознанного DE — честно сообщаем о неудаче

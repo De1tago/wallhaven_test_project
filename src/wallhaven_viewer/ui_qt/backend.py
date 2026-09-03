@@ -20,7 +20,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 
 from wallhaven_viewer.core.api import WallhavenAPI
 from wallhaven_viewer.core.cache import extract_wallpaper_id
@@ -158,7 +158,7 @@ class Backend(QObject):
         self._search_done.connect(self._on_search_done)
 
         # Следим за сменой системной темы (для режима "system")
-        app = QGuiApplication.instance()
+        app = QApplication.instance()
         if app is not None:
             style_hints = app.styleHints()
             style_hints.colorSchemeChanged.connect(self._on_system_scheme_changed)
@@ -387,7 +387,7 @@ class Backend(QObject):
     @Property(bool, notify=isDarkChanged)
     def isDark(self):
         """Эффективная тема: только определение из системы."""
-        app = QGuiApplication.instance()
+        app = QApplication.instance()
         if app is not None:
             try:
                 scheme = app.styleHints().colorScheme()
@@ -654,15 +654,33 @@ class Backend(QObject):
         if not local_path or not os.path.exists(local_path):
             self.wallpaperSet.emit("Нет локального файла — сначала сохраните обои")
             return
+
+        def worker():
+            try:
+                if set_desktop_wallpaper(local_path):
+                    self.wallpaperSet.emit("Обои установлены")
+                else:
+                    self.wallpaperSet.emit(
+                        "Не удалось установить обои: нет портала или поддерживаемого окружения"
+                    )
+            except Exception as e:
+                self.wallpaperSet.emit(f"Ошибка установки обоев: {e}")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @Slot(result=str)
+    def browseFolder(self):
+        """Открывает нативный диалог выбора папки (не зависит от.portal)."""
         try:
-            if set_desktop_wallpaper(local_path):
-                self.wallpaperSet.emit("Обои установлены")
-            else:
-                self.wallpaperSet.emit(
-                    "Не удалось установить обои: нет портала или поддерживаемого окружения"
-                )
-        except Exception as e:
-            self.wallpaperSet.emit(f"Ошибка установки обоев: {e}")
+            from PySide6.QtWidgets import QFileDialog
+
+            folder = QFileDialog.getExistingDirectory(
+                None, "Выберите папку для сохранения",
+                self._settings.get("download_path", "") or str(Path.home()),
+            )
+            return folder or ""
+        except Exception:
+            return ""
 
     @Slot(str)
     def openInBrowser(self, wallpaper_id):

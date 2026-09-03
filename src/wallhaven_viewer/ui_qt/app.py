@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
 from wallhaven_viewer.ui_qt.backend import Backend
@@ -86,7 +86,7 @@ def _apply_breeze_theme(app, dark):
 
 
 class WallhavenQtApp:
-    """Оболочка Qt-приложения: создаёт QGuiApplication, грузит Main.qml."""
+    """Оболочка Qt-приложения: создаёт QApplication, грузит Main.qml."""
 
     def __init__(self, argv=None):
         self._argv = list(argv) if argv is not None else list(sys.argv)
@@ -160,7 +160,7 @@ class WallhavenQtApp:
         # цвета прямо из палитры приложения.
         use_system_theme = os.environ.get("WALLHAVEN_SYSTEM_THEME") == "1"
 
-        app = QGuiApplication(self._argv)
+        app = QApplication(self._argv)
         app.setApplicationName("Wallhaven Viewer")
         app.setOrganizationName("Wallhaven")
         app.setApplicationDisplayName("Wallhaven Viewer")

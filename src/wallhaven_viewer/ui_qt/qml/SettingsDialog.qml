@@ -93,7 +93,13 @@ Window {
                 text: "Обзор…"
                 implicitHeight: 36
                 implicitWidth: 96
-                onClicked: folderDialog.open()
+                onClicked: {
+                    // Нативный диалог (через QFileDialog) работает
+                    // без xdg-desktop-portal — надёжнее QML FolderDialog.
+                    var folder = backend.browseFolder()
+                    if (folder.length > 0)
+                        pathField.text = folder
+                }
             }
             AppButton {
                 id: clearBtn
@@ -160,14 +166,4 @@ Window {
         }
     }
 
-    FolderDialog {
-        id: folderDialog
-        title: "Выберите папку для сохранения"
-
-        onAccepted: {
-            // toLocalFile() корректно преобразует file:///C:/... в C:/...
-            // (без ведущего слэша, иначе на Windows путь невалиден).
-            pathField.text = selectedFolder.toLocalFile()
-        }
-    }
 }

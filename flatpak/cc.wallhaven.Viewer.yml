@@ -45,6 +45,7 @@ modules:
       - mkdir -p /app/lib/wallhaven_viewer
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/128x128/apps
       - mkdir -p /app/share/icons/hicolor/256x256/apps
       - mkdir -p /app/share/wallhaven_viewer/css
       - mkdir -p /app/share/wallhaven_viewer/ui
@@ -56,6 +57,7 @@ modules:
       - install -m 644 data/ui/*.ui /app/share/wallhaven_viewer/ui/
       - install -m 644 data/css/*.css /app/share/wallhaven_viewer/css/
       - install -m 644 data/applications/cc.wallhaven.Viewer.desktop /app/share/applications/
+      - install -m 644 data/icons/hicolor/128x128/apps/cc.wallhaven.Viewer.png /app/share/icons/hicolor/128x128/apps/
       - install -m 644 data/icons/hicolor/256x256/apps/cc.wallhaven.Viewer.png /app/share/icons/hicolor/256x256/apps/
 
       # 6. Создаём тот самый файл wallhaven-viewer, который ищет .desktop

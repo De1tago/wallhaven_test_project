@@ -28,11 +28,19 @@ Window {
         anchors.margins: 24
         spacing: 16
 
+        Image {
+            Layout.alignment: Qt.AlignHCenter
+            source: "icons/app-icon.png"
+            sourceSize.width: 96
+            sourceSize.height: 96
+        }
+
         Label {
             text: "Wallhaven Viewer"
             font.pixelSize: 20
             font.bold: true
             color: cText
+            Layout.alignment: Qt.AlignHCenter
         }
         Label {
             text: "Просмотр и скачивание обоев с wallhaven.cc"

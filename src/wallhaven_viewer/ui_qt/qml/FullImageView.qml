@@ -147,7 +147,7 @@ Window {
             }
 
             AppButton {
-                text: "Установить обоями"
+                text: "Установить обои"
                 accent: true
                 enabled: root.localPath.length > 0
                 onClicked: backend.setWallpaper(root.localPath)

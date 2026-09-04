@@ -167,19 +167,35 @@ class WallhavenQtApp:
 
         # Иконка приложения (заголовок окна и панель задач).
         # В собранном виде (.exe) берём иконку из бандла, иначе —
-        # из каталога assets репозитория.
+        # из каталога assets репозитория. В Flatpak иконка лежит
+        # в hicolor-теме.
         try:
+            from PySide6.QtGui import QIcon
+
+            icon_path = ""
             if getattr(sys, "frozen", False):
                 icon_path = os.path.join(
                     sys._MEIPASS, "assets", "app-icon.ico"
                 )
             else:
-                icon_path = os.path.join(
+                # Источник: assets/ репозитория (разработка)
+                repo_icon = os.path.join(
                     Path(__file__).resolve().parents[3],
                     "assets", "app-icon.ico"
                 )
-            if os.path.exists(icon_path):
-                from PySide6.QtGui import QIcon
+                if os.path.exists(repo_icon):
+                    icon_path = repo_icon
+                else:
+                    # Flatpak / установка: ищем в hicolor-теме
+                    for size in ("512x512", "256x256", "128x128"):
+                        candidate = os.path.join(
+                            "/app/share/icons/hicolor", size, "apps",
+                            "cc.wallhaven.Viewer.png"
+                        )
+                        if os.path.exists(candidate):
+                            icon_path = candidate
+                            break
+            if icon_path and os.path.exists(icon_path):
                 app.setWindowIcon(QIcon(icon_path))
         except Exception as exc:  # noqa: BLE001
             print(f"[Warn] Не удалось установить иконку: {exc}")

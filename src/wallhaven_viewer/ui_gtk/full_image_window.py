@@ -167,6 +167,16 @@ class FullImageWindow(Gtk.Window):
         GLib.idle_add(self._show_error_ui, message)
 
     def _show_error_ui(self, message):
+        self._error_bar.set_message_type(Gtk.MessageType.ERROR)
+        self._error_label.set_text(message)
+        self._error_bar.set_visible(True)
+        GLib.timeout_add_seconds(5, lambda: self._error_bar.set_visible(False))
+
+    def show_success(self, message):
+        GLib.idle_add(self._show_success_ui, message)
+
+    def _show_success_ui(self, message):
+        self._error_bar.set_message_type(Gtk.MessageType.INFO)
         self._error_label.set_text(message)
         self._error_bar.set_visible(True)
         GLib.timeout_add_seconds(5, lambda: self._error_bar.set_visible(False))
@@ -599,7 +609,7 @@ class FullImageWindow(Gtk.Window):
 
         try:
             if set_desktop_wallpaper(self.local_path):
-                print(f"✅ Обои установлены: {self.local_path}")
+                self.show_success("Установлено успешно")
             else:
                 self.show_error(
                     "Не удалось установить обои. Убедитесь, что доступен "

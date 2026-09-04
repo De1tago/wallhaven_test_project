@@ -23,45 +23,72 @@ def wallpaper_portal_available() -> bool:
             timeout=2
         )
         return b"(" in out  # ответ пришёл
-    except Exception:
+    except FileNotFoundError:
+        print("[WallpaperSetter] gdbus not found", flush=True)
+        return False
+    except Exception as e:
+        print(f"[WallpaperSetter] portal check failed: {e}", flush=True)
         return False
 
 
 def _set_via_portal(image_path: str) -> bool:
     """Устанавливает обои через xdg-desktop-portal (Wayland/GNOME/KDE).
 
-    Требует ``dbus-python``: через gdbus CLI невозможно корректно
-    передать UnixFd, поэтому без этой библиотеки портальный метод
-    недоступен и управление возвращается вызывающему коду для
-    использования DE-специфичных методов.
+    Пробует два способа:
+    1. ``dbus-python`` — передаёт файловый дескриптор (UnixFd).
+    2. ``gdbus`` CLI + ``SetWallpaperURI`` — запасной вариант для
+       Flatpak и сред, где dbus-python недоступен.
     """
-    if not wallpaper_portal_available():
-        return False
+    uri = "file://" + os.path.abspath(image_path)
 
+    # Способ 1: dbus-python (UnixFd)
     try:
         import dbus
         import dbus.types
-    except ImportError:
-        return False
-
-    try:
-        bus = dbus.SessionBus()
-        iface = dbus.Interface(
-            bus.get_object("org.freedesktop.portal.Desktop",
-                           "/org/freedesktop/portal/desktop"),
-            "org.freedesktop.portal.Wallpaper")
-        fd = os.open(image_path, os.O_RDONLY)
         try:
-            iface.SetWallpaperFile(
-                "",
-                dbus.types.UnixFd(fd),
-                {'show-preview': dbus.Boolean(False, variant_level=1)}
-            )
+            bus = dbus.SessionBus()
+            iface = dbus.Interface(
+                bus.get_object("org.freedesktop.portal.Desktop",
+                               "/org/freedesktop/portal/desktop"),
+                "org.freedesktop.portal.Wallpaper")
+            fd = os.open(image_path, os.O_RDONLY)
+            try:
+                iface.SetWallpaperFile(
+                    "",
+                    dbus.types.UnixFd(fd),
+                    {'show-preview': dbus.Boolean(False, variant_level=1)}
+                )
+                return True
+            finally:
+                os.close(fd)
+        except Exception as e:
+            print(f"[WallpaperSetter] dbus-python SetWallpaperFile failed: {e}", flush=True)
+    except ImportError:
+        print("[WallpaperSetter] dbus-python not available, trying gdbus CLI", flush=True)
+
+    # Способ 2: gdbus CLI + SetWallpaperURI (не требует dbus-python)
+    cmd = [
+        "gdbus", "call", "--session",
+        "--dest", "org.freedesktop.portal.Desktop",
+        "--object-path", "/org/freedesktop/portal/desktop",
+        "--method", "org.freedesktop.portal.Wallpaper.SetWallpaperURI",
+        "", uri, "{}",
+    ]
+    try:
+        result = subprocess.run(
+            cmd, check=False, timeout=10,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        if result.returncode == 0:
             return True
-        finally:
-            os.close(fd)
-    except Exception:
-        return False
+        print(f"[WallpaperSetter] gdbus SetWallpaperURI failed (rc={result.returncode}): "
+              f"{result.stderr.decode(errors='replace').strip()}", flush=True)
+    except FileNotFoundError:
+        print("[WallpaperSetter] gdbus not found", flush=True)
+    except Exception as e:
+        print(f"[WallpaperSetter] gdbus SetWallpaperURI exception: {e}", flush=True)
+
+    return False
 
 
 def _set_gnome(image_path: str) -> bool:
@@ -91,7 +118,9 @@ def _set_kde(image_path: str) -> bool:
         if result.returncode == 0:
             return True
     except FileNotFoundError:
-        pass
+        print("[WallpaperSetter] plasma-apply-wallpaperimage not found", flush=True)
+    except Exception as e:
+        print(f"[WallpaperSetter] plasma-apply-wallpaperimage failed: {e}", flush=True)
 
     # 2. D-Bus через qdbus6 (Plasma 6) или qdbus (Plasma 5)
     jscript = f"""
@@ -115,9 +144,11 @@ def _set_kde(image_path: str) -> bool:
                 return True
         except FileNotFoundError:
             continue
-        except Exception:
+        except Exception as e:
+            print(f"[WallpaperSetter] {qdbus_bin} failed: {e}", flush=True)
             continue
 
+    print("[WallpaperSetter] _set_kde: all methods failed", flush=True)
     return False
 
 
@@ -169,9 +200,12 @@ def set_desktop_wallpaper(image_path: str) -> bool:
     if sys.platform.startswith("linux"):
         desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
 
-        # KDE — нативный метод надёжнее портала (портал может показать
-        # диалог подтверждения или конфликтовать с управлением обоев Plasma)
+        # KDE — в Flatpak-песочнице нативные утилиты (plasma-apply-wallpaperimage,
+        # qdbus) недоступны, поэтому сначала пробуем портал (он работает через
+        # xdg-desktop-portal-kde). Если портал не помог — нативные методы.
         if "KDE" in desktop:
+            if _set_via_portal(image_path):
+                return True
             return _set_kde(image_path)
 
         # 1. Портал — работает на Wayland и большинстве DE (включая Flatpak)

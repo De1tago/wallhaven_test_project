@@ -658,7 +658,7 @@ class Backend(QObject):
         def worker():
             try:
                 if set_desktop_wallpaper(local_path):
-                    self.wallpaperSet.emit("Обои установлены")
+                    self.wallpaperSet.emit("Установлено успешно")
                 else:
                     self.wallpaperSet.emit(
                         "Не удалось установить обои: нет портала или поддерживаемого окружения"

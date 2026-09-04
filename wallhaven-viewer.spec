@@ -37,6 +37,9 @@ datas = [
     (os.path.join(DATA, "ui"), "data/ui"),
     (os.path.join(UI_QT, "qml"), "wallhaven_viewer/ui_qt/qml"),
     (os.path.join(UI_QT, "resources"), "wallhaven_viewer/ui_qt/resources"),
+    # Иконки приложения (app-icon.png/.ico) — их берёт Qt-интерфейс
+    # из _MEIPASS/assets для setWindowIcon().
+    (os.path.join(PROJECT_ROOT, "assets"), "assets"),
 ]
 
 hiddenimports = [

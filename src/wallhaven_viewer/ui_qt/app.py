@@ -165,40 +165,50 @@ class WallhavenQtApp:
         app.setOrganizationName("Wallhaven")
         app.setApplicationDisplayName("Wallhaven Viewer")
 
-        # Иконка приложения (заголовок окна и панель задач).
-        # В собранном виде (.exe) берём иконку из бандла, иначе —
-        # из каталога assets репозитория. В Flatpak иконка лежит
-        # в hicolor-теме.
-        try:
-            from PySide6.QtGui import QIcon
+        # Сообщаем Wayland-композитору (KDE KWin и др.) имя .desktop-файла:
+        # по нему он сопоставляет окно с иконкой приложения в панели задач.
+        # Без этого под нативным Wayland в трее появляется значок-заглушка
+        # в виде шестерёнки "Wayland".
+        if sys.platform.startswith("linux"):
+            app.setDesktopFileName("cc.wallhaven.Viewer")
 
-            icon_path = ""
+        # Иконка приложения (заголовок окна и панель задач).
+        # В собранном виде (.exe) берём иконку из бандла (_MEIPASS/assets),
+        # иначе — из каталога assets репозитория. В Flatpak иконка лежит
+        # в hicolor-теме. На Linux предпочитаем PNG (HiDPI), на Windows —
+        # ICO (мультиразмерный).
+        from PySide6.QtGui import QIcon
+
+        def icon_candidates():
+            png, ico = "app-icon.png", "app-icon.ico"
+            first, second = (ico, png) if sys.platform == "win32" else (png, ico)
+
             if getattr(sys, "frozen", False):
-                icon_path = os.path.join(
-                    sys._MEIPASS, "assets", "app-icon.ico"
-                )
-            else:
-                # Источник: assets/ репозитория (разработка)
-                repo_icon = os.path.join(
-                    Path(__file__).resolve().parents[3],
-                    "assets", "app-icon.ico"
-                )
-                if os.path.exists(repo_icon):
-                    icon_path = repo_icon
-                else:
-                    # Flatpak / установка: ищем в hicolor-теме
-                    for size in ("512x512", "256x256", "128x128"):
-                        candidate = os.path.join(
-                            "/app/share/icons/hicolor", size, "apps",
-                            "cc.wallhaven.Viewer.png"
-                        )
-                        if os.path.exists(candidate):
-                            icon_path = candidate
-                            break
-            if icon_path and os.path.exists(icon_path):
-                app.setWindowIcon(QIcon(icon_path))
-        except Exception as exc:  # noqa: BLE001
-            print(f"[Warn] Не удалось установить иконку: {exc}")
+                meipass = Path(getattr(sys, "_MEIPASS", ""))
+                yield meipass / "assets" / first
+                yield meipass / "assets" / second
+                yield meipass / "assets" / "ico" / "256x256.png"
+                return
+
+            repo = Path(__file__).resolve().parents[3] / "assets"
+            yield repo / first
+            yield repo / second
+            # Flatpak / установка: ищем в hicolor-теме
+            for size in ("512x512", "256x256", "128x128"):
+                yield Path("/app/share/icons/hicolor") / size / "apps" \
+                    / "cc.wallhaven.Viewer.png"
+
+        icon_set = False
+        for candidate in icon_candidates():
+            if candidate.exists():
+                try:
+                    app.setWindowIcon(QIcon(str(candidate)))
+                    icon_set = True
+                except Exception:
+                    continue
+                break
+        if not icon_set:
+            print("[Warn] Не удалось установить иконку приложения")
 
         # Подключаем нативные иконки темы Breeze. Сам иконочный пакет
         # (breeze-icons.rcc) поставляется вместе с приложением, поэтому
@@ -284,6 +294,12 @@ class WallhavenQtApp:
         if not engine.rootObjects():
             print("[Error] Не удалось загрузить Main.qml")
             return 1
+
+        # Некоторые QML-окна (в т.ч. ApplicationWindow) не наследуют иконку
+        # приложения автоматически — проставляем её каждому top-level окну,
+        # чтобы в заголовке и панели задач была правильная иконка.
+        for w in QApplication.topLevelWindows():
+            w.setIcon(app.windowIcon())
 
         # Небольшая задержка перед первым поиском — окно уже отрисовано
         from PySide6.QtCore import QTimer

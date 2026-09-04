@@ -108,30 +108,56 @@ def _set_gnome(image_path: str) -> bool:
 
 def _set_kde(image_path: str) -> bool:
     """Устанавливает обои в KDE Plasma через D-Bus или CLI."""
+    abs_path = os.path.abspath(image_path)
+    uri = "file://" + abs_path
+
     # 1. plasma-apply-wallpaperimage (Plasma 5.20+ и Plasma 6)
     try:
         result = subprocess.run(
-            ["plasma-apply-wallpaperimage", image_path],
+            ["plasma-apply-wallpaperimage", abs_path],
             check=False, timeout=15,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         if result.returncode == 0:
             return True
     except FileNotFoundError:
-        print("[WallpaperSetter] plasma-apply-wallpaperimage not found", flush=True)
+        pass
     except Exception as e:
         print(f"[WallpaperSetter] plasma-apply-wallpaperimage failed: {e}", flush=True)
 
-    # 2. D-Bus через qdbus6 (Plasma 6) или qdbus (Plasma 5)
-    jscript = f"""
-    var allDesktops = desktops();
-    for (var i = 0; i < allDesktops.length; i++) {{
-        var d = allDesktops[i];
-        d.wallpaperPlugin = "org.kde.image";
-        d.currentConfigGroup = Array("Wallpaper", "org.kde.image", "General");
-        d.writeConfig("Image", "file://{image_path}");
-    }}
-    """
+    # 2. gdbus → org.kde.plasmashell (работает в Flatpak, т.к. gdbus
+    #    есть в GNOME-рантайме, а разрешение --talk-name уже выдано)
+    jscript = (
+        'var allDesktops = desktops();'
+        'for (var i = 0; i < allDesktops.length; i++) {'
+        '  var d = allDesktops[i];'
+        '  d.wallpaperPlugin = "org.kde.image";'
+        '  d.currentConfigGroup = Array("Wallpaper", "org.kde.image", "General");'
+        f'  d.writeConfig("Image", "{uri}");'
+        '}'
+    )
+    cmd = [
+        "gdbus", "call", "--session",
+        "--dest", "org.kde.plasmashell",
+        "--object-path", "/PlasmaShell",
+        "--method", "org.kde.PlasmaShell.evaluateScript",
+        jscript,
+    ]
+    try:
+        result = subprocess.run(
+            cmd, check=False, timeout=15,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        if result.returncode == 0:
+            return True
+        print(f"[WallpaperSetter] gdbus PlasmaShell failed (rc={result.returncode}): "
+              f"{result.stderr.decode(errors='replace').strip()}", flush=True)
+    except FileNotFoundError:
+        print("[WallpaperSetter] gdbus not found", flush=True)
+    except Exception as e:
+        print(f"[WallpaperSetter] gdbus PlasmaShell exception: {e}", flush=True)
+
+    # 3. D-Bus через qdbus6 (Plasma 6) или qdbus (Plasma 5)
     for qdbus_bin in ("qdbus6", "qdbus"):
         cmd = [qdbus_bin, "org.kde.plasmashell", "/PlasmaShell",
                "org.kde.PlasmaShell.evaluateScript", jscript]
@@ -200,13 +226,12 @@ def set_desktop_wallpaper(image_path: str) -> bool:
     if sys.platform.startswith("linux"):
         desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
 
-        # KDE — в Flatpak-песочнице нативные утилиты (plasma-apply-wallpaperimage,
-        # qdbus) недоступны, поэтому сначала пробуем портал (он работает через
-        # xdg-desktop-portal-kde). Если портал не помог — нативные методы.
+        # KDE — нативные методы (plasma-apply-wallpaperimage, gdbus →
+        # PlasmaShell, qdbus) надёжнее портала. Портал — запасной вариант.
         if "KDE" in desktop:
-            if _set_via_portal(image_path):
+            if _set_kde(image_path):
                 return True
-            return _set_kde(image_path)
+            return _set_via_portal(image_path)
 
         # 1. Портал — работает на Wayland и большинстве DE (включая Flatpak)
         if _set_via_portal(image_path):

@@ -87,6 +87,8 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+APP_ICON = os.path.join(PROJECT_ROOT, "assets", "app-icon.png")
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -94,6 +96,7 @@ exe = EXE(
     a.datas,
     [],
     name="wallhaven-viewer",
+    icon=APP_ICON,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

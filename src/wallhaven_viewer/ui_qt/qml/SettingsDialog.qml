@@ -10,7 +10,7 @@ Window {
     title: "Настройки"
     width: 480
     height: 360
-    flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint
+    flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowSystemMenuHint | Qt.WindowTitleHint
     modality: Qt.NonModal
     color: cContent
 

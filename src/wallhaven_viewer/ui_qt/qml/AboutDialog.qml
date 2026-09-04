@@ -9,7 +9,7 @@ Window {
     title: "О программе"
     width: 420
     height: 280
-    flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint
+    flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowSystemMenuHint | Qt.WindowTitleHint
     modality: Qt.NonModal
     color: cContent
 
